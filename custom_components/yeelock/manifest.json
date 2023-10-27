@@ -1,0 +1,27 @@
+{
+	"domain": "yeelock",
+	"name": "Yeelock BLE",
+	"bluetooth": [
+		{
+			"local_name": "EL_*"
+		},
+		{
+			"service_uuid": "58af3dca-6fc0-4fa3-9464-74662f043a3b"
+		},
+		{
+			"service_uuid": "58af3dca-6fc0-4fa3-9464-74662f043a3a"
+		}
+	],
+	"codeowners": [
+		"@codyc1515"
+	],
+	"config_flow": true,
+	"dependencies": [
+		"bluetooth"
+	],
+	"documentation": "https://github.com/codyc1515/hacs_yeelock",
+	"issue_tracker": "https://github.com/codyc1515/hacs_yeelock/issues",
+	"iot_class": "local_push",
+	"integration_type": "device",
+	"version": "1.0.0"
+}
