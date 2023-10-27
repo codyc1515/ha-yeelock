@@ -4,7 +4,8 @@
 ## Compatible devices
 
 * Yeelock Cabinet Lock E (Orange Stripe) / 易锁宝蓝牙抽屉柜锁E (Model: M02)
-* Possibly others - let me know if you find one that works
+
+Possibly others - let me know if you find one that works.
 
 ## Getting started
 Your Yeelock devices should be detected automatically by Home Assistant and be able to be configured from the UI.
