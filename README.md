@@ -32,3 +32,8 @@ Copy all files in the custom_components/hacs_yeelock folder to your Home Assista
 Your support is welcomed.
 
 * Integration with the Yeelock Cloud (App) API to obtain the key automatically
+
+## Acknowledgements
+- [aso824/yeehack](https://github.com/aso824/yeehack), who provided a sample Python framework for communicating with the Yeelock device
+- _jdobosz_ and his post [in this thread](https://community.home-assistant.io/t/xiaomi-mijia-yeelock-integration/92331/43), for documenting how the Yeelock protocol works
+- [cnrd/yeelock](https://github.com/cnrd/yeelock), for general observations on the Yeelock protocol packets
