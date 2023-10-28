@@ -1,5 +1,6 @@
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -15,25 +16,17 @@ async def async_setup_entry(
     yeelock_device: Yeelock = hass.data[DOMAIN][entry.unique_id]
     async_add_entities(
         [
-            YeelockLockButton(yeelock_device, hass),
-            YeelockUnlockButton(yeelock_device, hass)
+            YeelockQuickUnlockButton(yeelock_device, hass),
         ]
     )
     return True
 
 
-class YeelockLockButton(YeelockDeviceEntity, ButtonEntity):
-    """This button locks the device"""
-
-    _attr_name = 'Lock'
-
-    async def async_press(self):
-        self.hass.async_create_task(self.device.lock())
-
-class YeelockUnlockButton(YeelockDeviceEntity, ButtonEntity):
+class YeelockQuickUnlockButton(YeelockDeviceEntity, ButtonEntity):
     """This button unlocks the device"""
 
-    _attr_name = 'Unlock'
+    _attr_name = 'Quick Unlock'
+    _attr_entity_category = EntityCategory.CONFIG
 
     async def async_press(self):
-        self.hass.async_create_task(self.device.unlock())
+        self.hass.async_create_task(self.device.unlock_quick())

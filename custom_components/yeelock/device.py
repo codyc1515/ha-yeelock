@@ -71,7 +71,7 @@ class Yeelock:
 
     async def disconnect(self):
         """Disconnect from the device"""
-        _LOGGER.warning('Disconnect from %s', self.mac)
+        _LOGGER.debug('Disconnected from %s', self.mac)
         if (self._client is not None) and self._client.is_connected:
             await self._client.disconnect()
 
@@ -92,7 +92,7 @@ class Yeelock:
                             could not be found.'
                     )
                 self._client = BleakClient(self._device)
-                _LOGGER.warning('Connect to %s', self.mac)
+                _LOGGER.debug('Connecting to %s', self.mac)
                 await self._client.connect()
                 await self._client.start_notify(
                     uuid.UUID(UUID_NOTIFY), self._handle_data
@@ -103,7 +103,7 @@ class Yeelock:
         self._connecting = False
 
     async def _handle_data(self, sender, value):
-        _LOGGER.warning('Receiving: %s from %s', hexlify(value, ' '), sender)  # noqa: E501
+        _LOGGER.debug('Received %s from %s', hexlify(value, ' '), sender)  # noqa: E501
         #await self._event_trigger(value)
 
     def _encrypt(self, unlock_mode):
@@ -130,29 +130,41 @@ class Yeelock:
                      + int(unlock_mode, 16).to_bytes(1, 'big') \
                      + hmac_result
 
-        _LOGGER.warning('Sending: %s', output_value)
+        _LOGGER.debug('Sent %s', output_value)
         return output_value
 
     async def lock(self) -> None:
         """Lock the device."""
         await self._connect()
         try:
-            _LOGGER.warning('lock me')
+            _LOGGER.debug('Locking')
             await self._client.write_gatt_char(
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt("02"))
             )
         except BleakError as error:
             self.connected = False
-            _LOGGER.warning('BleakError: %s', error)
+            _LOGGER.error('BleakError: %s', error)
 
     async def unlock(self) -> None:
         """Unlock the device."""
         await self._connect()
         try:
-            _LOGGER.warning('unlock me')
+            _LOGGER.debug('Unlocking')
             await self._client.write_gatt_char(
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt("01"))
             )
         except BleakError as error:
             self.connected = False
-            _LOGGER.warning('BleakError: %s', error)
+            _LOGGER.error('BleakError: %s', error)
+
+    async def unlock_quick(self) -> None:
+        """Unlock the device then relock again quickly."""
+        await self._connect()
+        try:
+            _LOGGER.debug('Unlocking the device then relocking again quickly')
+            await self._client.write_gatt_char(
+                uuid.UUID(UUID_COMMAND), bytearray(self._encrypt("00"))
+            )
+        except BleakError as error:
+            self.connected = False
+            _LOGGER.error('BleakError: %s', error)

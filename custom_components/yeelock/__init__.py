@@ -11,7 +11,8 @@ from .const import DOMAIN
 from .device import Yeelock
 
 PLATFORMS: list[str] = [
-    Platform.BUTTON #,
+    Platform.BUTTON,
+    Platform.LOCK
     #Platform.BINARY_SENSOR,
     #Platform.SENSOR,
     #Platform.SELECT,
