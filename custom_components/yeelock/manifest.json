@@ -20,8 +20,8 @@
 		"bluetooth"
 	],
 	"documentation": "https://github.com/codyc1515/hacs_yeelock",
-	"issue_tracker": "https://github.com/codyc1515/hacs_yeelock/issues",
-	"iot_class": "local_push",
 	"integration_type": "device",
+	"iot_class": "local_push",
+	"issue_tracker": "https://github.com/codyc1515/hacs_yeelock/issues",
 	"version": "1.1.0"
 }
