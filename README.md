@@ -22,7 +22,7 @@ You will need to have a Bluetooth dongle or Bluetooth Proxies connected and with
 4. Restart Home Assistant
 
 ### Manually
-Copy all files in the custom_components/ha-yeelock folder to your Home Assistant folder *config/custom_components/yeelock*.
+Copy all files in the custom_components/yeelock folder to your Home Assistant folder *config/custom_components/yeelock*.
 
 ## Known issues
 
