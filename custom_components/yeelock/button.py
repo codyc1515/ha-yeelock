@@ -17,6 +17,7 @@ async def async_setup_entry(
     async_add_entities(
         [
             YeelockQuickUnlockButton(yeelock_device, hass),
+            YeelockTimeSyncButton(yeelock_device, hass)
         ]
     )
     return True
@@ -30,3 +31,12 @@ class YeelockQuickUnlockButton(YeelockDeviceEntity, ButtonEntity):
 
     async def async_press(self):
         self.hass.async_create_task(self.device.unlock_quick())
+
+class YeelockTimeSyncButton(YeelockDeviceEntity, ButtonEntity):
+    """This button syncs the time of the device"""
+
+    _attr_name = 'Time Sync'
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    async def async_press(self):
+        self.hass.async_create_task(self.device.time_sync())
