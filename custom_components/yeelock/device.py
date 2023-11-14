@@ -32,7 +32,9 @@ class YeelockDeviceEntity:
 
     def __init__(self, yeelock_device, hass: HomeAssistant):
         """Init entity with the device"""
-        self._attr_unique_id = f'{yeelock_device.mac}_{self.__class__.__name__}'  # noqa: E501
+        self._attr_unique_id = (
+            f"{yeelock_device.mac}_{self.__class__.__name__}"
+        )
         self.device: Yeelock = yeelock_device
         self.hass = hass
 
@@ -40,11 +42,11 @@ class YeelockDeviceEntity:
     def device_info(self):
         """Shared device info information"""
         return {
-            'identifiers': {(DOMAIN, self.device.mac)},
-            'connections': {(dr.CONNECTION_NETWORK_MAC, self.device.mac)},
-            'name': self.device.name,
-            'manufacturer': 'Xiaomi',
-            'model': self.device.model
+            "identifiers": {(DOMAIN, self.device.mac)},
+            "connections": {(dr.CONNECTION_NETWORK_MAC, self.device.mac)},
+            "name": self.device.name,
+            "manufacturer": "Xiaomi",
+            "model": self.device.model,
         }
 
 
@@ -62,9 +64,9 @@ class Yeelock:
         self.mac = config.get(CONF_MAC)
         self.name = config.get(CONF_NAME)
         self.key = config.get(CONF_API_KEY)
-        self.hostname = ''
-        self.model = 'Yeelock'
-        self.friendly_name = ''
+        self.hostname = ""
+        self.model = "Yeelock"
+        self.friendly_name = ""
         self.connected = False
         self.notify = False
         self.service = 0
@@ -72,7 +74,7 @@ class Yeelock:
 
     async def disconnect(self):
         """Disconnect from the device"""
-        _LOGGER.debug('Disconnected from %s', self.mac)
+        _LOGGER.debug("Disconnected from %s", self.mac)
         if (self._client is not None) and self._client.is_connected:
             await self._client.disconnect()
 
@@ -89,27 +91,26 @@ class Yeelock:
                 )
                 if not self._device:
                     raise BleakError(
-                        f'A device with address {self.mac} \
-                            could not be found.'
+                        f"A device with address {self.mac} could not be found."
                     )
                 self._client = BleakClient(self._device)
-                _LOGGER.debug('Connecting to %s', self.mac)
+                _LOGGER.debug("Connecting to %s", self.mac)
                 await self._client.connect()
-                _LOGGER.debug('Connected', self.mac)
+                _LOGGER.debug("Connected", self.mac)
                 await self._client.start_notify(
                     uuid.UUID(UUID_NOTIFY), self._handle_data
                 )
-                _LOGGER.debug('Listening for notifications', self.mac)
+                _LOGGER.debug("Listening for notifications", self.mac)
         except Exception as error:
             self._connecting = False
             raise error
         self._connecting = False
 
     async def _handle_data(self, sender, value):
-        _LOGGER.debug('Received %s from %s', hexlify(value, ' '), sender)  # noqa: E501
+        _LOGGER.debug("Received %s from %s", hexlify(value, " "), sender)  # noqa: E501
 
         # Hex the received message
-        received_message = hexlify(value, ' ')
+        received_message = hexlify(value, " ")
 
         # Extract the first element (index 0) and convert it to an integer
         first_byte = hex(int(received_message.split()[0], 16))
@@ -117,46 +118,46 @@ class Yeelock:
         # Lock change successes
         # Unlocking
         if first_byte == hex(0x2):
-            new_state = 'unlocking'
+            new_state = "unlocking"
 
         # Unlocked
         elif first_byte == hex(0x3):
-            new_state = 'unlocked'
+            new_state = "unlocked"
 
         # Locking
         elif first_byte == hex(0x4):
-            new_state = 'locking'
+            new_state = "locking"
 
         # Locked
         elif first_byte == hex(0x5):
-            new_state = 'locked'
+            new_state = "locked"
 
         # Lock change failures
         # Time needs to be synced
         elif first_byte == hex(0x9):
-            _LOGGER.warning('Time needs to be synced')
+            _LOGGER.warning("Time needs to be synced")
 
             # Perform time sync
             await self.time_sync()
 
             # Retry the original action
-            if self.lock_entity._attr_state == 'locking':
+            if self.lock_entity._attr_state == "locking":
                 await self.lock()
-            elif self.lock_entity._attr_state == 'unlocking':
+            elif self.lock_entity._attr_state == "unlocking":
                 await self.unlock()
 
         # Invalid signing key
         elif first_byte == hex(0xFF):
-            _LOGGER.error('Invalid signing key')
-            new_state = 'jammed'
+            _LOGGER.error("Invalid signing key")
+            new_state = "jammed"
 
         # Unknown error
         else:
-            _LOGGER.error('Unknown notification received')
-            new_state = 'jammed'
+            _LOGGER.error("Unknown notification received")
+            new_state = "jammed"
 
         # Update the lock state
-        _LOGGER.debug('Notified of %s', new_state)
+        _LOGGER.debug("Notified of %s", new_state)
 
         await self.lock_entity._update_lock_state(new_state)
 
@@ -171,20 +172,26 @@ class Yeelock:
         timestamp = int(time())
 
         # Generate the HMAC
-        message = unlock_command.to_bytes(1, "big") \
-                + admin_identification_mode.to_bytes(1, "big") \
-                + timestamp.to_bytes(4, 'big') \
-                + int(unlock_mode, 16).to_bytes(1, 'big')
-        hmac_result = bytearray.fromhex(hmac.new(key, message[:7], hashlib.sha1).hexdigest())[:13]
+        message = (
+            unlock_command.to_bytes(1, "big")
+            + admin_identification_mode.to_bytes(1, "big")
+            + timestamp.to_bytes(4, "big")
+            + int(unlock_mode, 16).to_bytes(1, "big")
+        )
+        hmac_result = bytearray.fromhex(
+            hmac.new(key, message[:7], hashlib.sha1).hexdigest()
+        )[:13]
 
         # Concatenate all the parts to create the output value as a bytearray
-        output_value = unlock_command.to_bytes(1, "big") \
-                     + admin_identification_mode.to_bytes(1, "big") \
-                     + timestamp.to_bytes(4, 'big') \
-                     + int(unlock_mode, 16).to_bytes(1, 'big') \
-                     + hmac_result
+        output_value = (
+            unlock_command.to_bytes(1, "big")
+            + admin_identification_mode.to_bytes(1, "big")
+            + timestamp.to_bytes(4, "big")
+            + int(unlock_mode, 16).to_bytes(1, "big")
+            + hmac_result
+        )
 
-        _LOGGER.debug('Sent transactional msg %s', output_value)
+        _LOGGER.debug("Sent transactional msg %s", output_value)
         return output_value
 
     def _encrypt_time(self):
@@ -198,64 +205,70 @@ class Yeelock:
         timestamp = int(time())
 
         # Generate the HMAC
-        message = unlock_command.to_bytes(1, "big") \
-                + admin_identification_mode.to_bytes(1, "big") \
-                + timestamp.to_bytes(4, 'big')
-        hmac_result = bytearray.fromhex(hmac.new(key, message[:6], hashlib.sha1).hexdigest())[:14]
+        message = (
+            unlock_command.to_bytes(1, "big")
+            + admin_identification_mode.to_bytes(1, "big")
+            + timestamp.to_bytes(4, "big")
+        )
+        hmac_result = bytearray.fromhex(
+            hmac.new(key, message[:6], hashlib.sha1).hexdigest()
+        )[:14]
 
         # Concatenate all the parts to create the output value as a bytearray
-        output_value = unlock_command.to_bytes(1, "big") \
-                     + admin_identification_mode.to_bytes(1, "big") \
-                     + timestamp.to_bytes(4, 'big') \
-                     + hmac_result
+        output_value = (
+            unlock_command.to_bytes(1, "big")
+            + admin_identification_mode.to_bytes(1, "big")
+            + timestamp.to_bytes(4, "big")
+            + hmac_result
+        )
 
-        _LOGGER.debug('Sent time sync msg %s', output_value)
+        _LOGGER.debug("Sent time sync msg %s", output_value)
         return output_value
 
     async def lock(self) -> None:
         """Lock the device."""
         await self._connect()
         try:
-            _LOGGER.debug('Locking')
+            _LOGGER.debug("Locking")
             await self._client.write_gatt_char(
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt("02"))
             )
         except BleakError as error:
             self.connected = False
-            _LOGGER.error('BleakError: %s', error)
+            _LOGGER.error("BleakError: %s", error)
 
     async def unlock(self) -> None:
         """Unlock the device."""
         await self._connect()
         try:
-            _LOGGER.debug('Unlocking')
+            _LOGGER.debug("Unlocking")
             await self._client.write_gatt_char(
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt("01"))
             )
         except BleakError as error:
             self.connected = False
-            _LOGGER.error('BleakError: %s', error)
+            _LOGGER.error("BleakError: %s", error)
 
     async def unlock_quick(self) -> None:
         """Unlock the device then relock again quickly."""
         await self._connect()
         try:
-            _LOGGER.debug('Unlocking the device then relocking again quickly')
+            _LOGGER.debug("Unlocking the device then relocking again quickly")
             await self._client.write_gatt_char(
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt("00"))
             )
         except BleakError as error:
             self.connected = False
-            _LOGGER.error('BleakError: %s', error)
+            _LOGGER.error("BleakError: %s", error)
 
     async def time_sync(self) -> None:
         """Time sync."""
         await self._connect()
         try:
-            _LOGGER.debug('Time sync start')
+            _LOGGER.debug("Time sync start")
             await self._client.write_gatt_char(
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt_time())
             )
         except BleakError as error:
             self.connected = False
-            _LOGGER.error('BleakError: %s', error)
+            _LOGGER.error("BleakError: %s", error)
