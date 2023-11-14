@@ -114,29 +114,27 @@ class Yeelock:
         # Extract the first element (index 0) and convert it to an integer
         first_byte = hex(int(received_message.split()[0], 16))
 
-        # Process common notifications of lock state
+        # Lock change successes
+        # Unlocking
         if first_byte == hex(0x2):
             new_state = 'unlocking'
+
+        # Unlocked
         elif first_byte == hex(0x3):
             new_state = 'unlocked'
+
+        # Locking
         elif first_byte == hex(0x4):
             new_state = 'locking'
+
+        # Locked
         elif first_byte == hex(0x5):
             new_state = 'locked'
 
-        # Lock change failed
-        else:
-            # Mark state as jammed
-            new_state = 'jammed'
-            await self.lock_entity._update_lock_state(new_state)
-
-            # Run through failure scenarios
-            if first_byte == hex(0x9):
-                _LOGGER.warning('Time needs to be synced')
-            elif first_byte == hex(0xFF):
-                _LOGGER.error('Invalid signing key')
-            else:
-                _LOGGER.error('Unknown notification received')
+        # Lock change failures
+        # Time needs to be synced
+        elif first_byte == hex(0x9):
+            _LOGGER.warning('Time needs to be synced')
 
             # Perform time sync
             await self.time_sync()
@@ -147,9 +145,19 @@ class Yeelock:
             elif self.lock_entity._attr_state == 'unlocking':
                 await self.unlock()
 
+        # Invalid signing key
+        elif first_byte == hex(0xFF):
+            _LOGGER.error('Invalid signing key')
+            new_state = 'jammed'
+
+        # Unknown error
+        else:
+            _LOGGER.error('Unknown notification received')
+            new_state = 'jammed'
+
         # Update the lock state
         _LOGGER.debug('Notified of %s', new_state)
-        
+
         await self.lock_entity._update_lock_state(new_state)
 
     def _encrypt(self, unlock_mode):
