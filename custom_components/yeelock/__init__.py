@@ -7,19 +7,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .const import DOMAIN, PLATFORMS
 from .device import Yeelock
-
-PLATFORMS: list[str] = [
-    Platform.BUTTON,
-    Platform.LOCK
-    # Platform.BINARY_SENSOR,
-    # Platform.SENSOR,
-    # Platform.SELECT,
-    # Platform.SWITCH,
-    # Platform.TEXT,
-    # Platform.DEVICE_TRACKER
-]
 
 
 _LOGGER = logging.getLogger(__name__)
