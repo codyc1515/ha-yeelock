@@ -114,6 +114,9 @@ class Yeelock:
 
         # Extract the first element (index 0) and convert it to an integer
         first_byte = hex(int(received_message.split()[0], 16))
+        
+        # Set a default just in case
+        new_state = "jammed"
 
         # Lock change successes
         # Unlocking
@@ -142,9 +145,9 @@ class Yeelock:
 
             # Retry the original action
             if self.lock_entity._attr_state == "locking":
-                await self.lock()
+                return await self.lock()
             elif self.lock_entity._attr_state == "unlocking":
-                await self.unlock()
+                return await self.unlock()
 
         # Invalid signing key
         elif first_byte == hex(0xFF):
@@ -158,7 +161,6 @@ class Yeelock:
 
         # Update the lock state
         _LOGGER.debug("Notified of %s", new_state)
-
         await self.lock_entity._update_lock_state(new_state)
 
     def _encrypt(self, unlock_mode):
