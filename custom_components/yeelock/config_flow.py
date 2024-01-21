@@ -54,7 +54,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, discovery_info: BluetoothServiceInfoBleak
     ) -> FlowResult:
         """Handle the bluetooth discovery step."""
-
         _LOGGER.debug('Starting bluetooth step')
 
         await self.async_set_unique_id(discovery_info.address)
