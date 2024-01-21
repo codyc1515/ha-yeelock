@@ -1,6 +1,4 @@
 """Yeelock device description"""
-import asyncio
-import datetime
 import hashlib
 import hmac
 import logging
@@ -9,8 +7,7 @@ from binascii import hexlify
 from time import time
 
 from bleak import BleakClient
-from bleak.exc import BleakDBusError, BleakError
-from homeassistant.backports.enum import StrEnum
+from bleak.exc import BleakError
 from homeassistant.components import bluetooth
 from homeassistant.const import CONF_API_KEY, CONF_MAC, CONF_NAME
 from homeassistant.core import HomeAssistant
@@ -32,9 +29,7 @@ class YeelockDeviceEntity:
 
     def __init__(self, yeelock_device, hass: HomeAssistant):
         """Init entity with the device"""
-        self._attr_unique_id = (
-            f"{yeelock_device.mac}_{self.__class__.__name__}"
-        )
+        self._attr_unique_id = f"{yeelock_device.mac}_{self.__class__.__name__}"
         self.device: Yeelock = yeelock_device
         self.hass = hass
 
@@ -114,7 +109,7 @@ class Yeelock:
 
         # Extract the first element (index 0) and convert it to an integer
         first_byte = hex(int(received_message.split()[0], 16))
-        
+
         # Set a default just in case
         new_state = "jammed"
 
@@ -168,7 +163,6 @@ class Yeelock:
         unlock_command = 0x01
         admin_identification_mode = 0x50
         key = bytearray.fromhex(self.key)
-        variant = hashlib.sha1
 
         # Convert epoch time to a human-readable date and time
         timestamp = int(time())
@@ -201,7 +195,6 @@ class Yeelock:
         unlock_command = 0x08
         admin_identification_mode = 0x40
         key = bytearray.fromhex(self.key)
-        variant = hashlib.sha1
 
         # Convert epoch time to a human-readable date and time
         timestamp = int(time())

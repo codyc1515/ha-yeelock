@@ -13,3 +13,5 @@ PLATFORMS: list[str] = [
     # Platform.TEXT,
     # Platform.DEVICE_TRACKER
 ]
+
+CONF_PHONE = "phone"
