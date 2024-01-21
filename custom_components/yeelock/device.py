@@ -1,6 +1,4 @@
-"""Yeelock device description"""
-import asyncio
-import datetime
+"""Yeelock device."""
 import hashlib
 import hmac
 import logging
@@ -9,8 +7,7 @@ from binascii import hexlify
 from time import time
 
 from bleak import BleakClient
-from bleak.exc import BleakDBusError, BleakError
-from homeassistant.backports.enum import StrEnum
+from bleak.exc import BleakError
 from homeassistant.components import bluetooth
 from homeassistant.const import CONF_API_KEY, CONF_MAC, CONF_NAME
 from homeassistant.core import HomeAssistant
@@ -26,21 +23,19 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class YeelockDeviceEntity:
-    """Entity class for the Yeelock devices"""
+    """Entity class for the Yeelock devices."""
 
     _attr_has_entity_name = True
 
     def __init__(self, yeelock_device, hass: HomeAssistant):
-        """Init entity with the device"""
-        self._attr_unique_id = (
-            f"{yeelock_device.mac}_{self.__class__.__name__}"
-        )
+        """Init entity with the device."""
+        self._attr_unique_id = f"{yeelock_device.mac}_{self.__class__.__name__}"
         self.device: Yeelock = yeelock_device
         self.hass = hass
 
     @property
     def device_info(self):
-        """Shared device info information"""
+        """Shared device info information."""
         return {
             "identifiers": {(DOMAIN, self.device.mac)},
             "connections": {(dr.CONNECTION_NETWORK_MAC, self.device.mac)},
@@ -51,10 +46,10 @@ class YeelockDeviceEntity:
 
 
 class Yeelock:
-    """Yeelock class"""
+    """Yeelock class."""
 
     def __init__(self, config: dict, hass: HomeAssistant) -> None:
-        """Initialize device"""
+        """Initialize device."""
         self._device_status = None
         self._client = None
         self._hass = hass
@@ -73,14 +68,14 @@ class Yeelock:
         self.is_on = False
 
     async def disconnect(self):
-        """Disconnect from the device"""
+        """Disconnect from the device."""
         _LOGGER.debug("Disconnected from %s", self.mac)
         if (self._client is not None) and self._client.is_connected:
             await self._client.disconnect()
 
     async def _connect(self):
-        """
-        Connect to the device
+        """Connect to the device.
+
         :raises BleakError: if the device is not found
         """
         self._connecting = True
@@ -107,6 +102,7 @@ class Yeelock:
         self._connecting = False
 
     async def _handle_data(self, sender, value):
+        """Handle data notifications."""
         _LOGGER.debug("Received %s from %s", hexlify(value, " "), sender)  # noqa: E501
 
         # Hex the received message
@@ -114,7 +110,7 @@ class Yeelock:
 
         # Extract the first element (index 0) and convert it to an integer
         first_byte = hex(int(received_message.split()[0], 16))
-        
+
         # Set a default just in case
         new_state = "jammed"
 
@@ -164,11 +160,11 @@ class Yeelock:
         await self.lock_entity._update_lock_state(new_state)
 
     def _encrypt(self, unlock_mode):
+        """Encrypt the data."""
         # Given values
         unlock_command = 0x01
         admin_identification_mode = 0x50
         key = bytearray.fromhex(self.key)
-        variant = hashlib.sha1
 
         # Convert epoch time to a human-readable date and time
         timestamp = int(time())
@@ -197,11 +193,11 @@ class Yeelock:
         return output_value
 
     def _encrypt_time(self):
+        """Encrypt the time."""
         # Given values
         unlock_command = 0x08
         admin_identification_mode = 0x40
         key = bytearray.fromhex(self.key)
-        variant = hashlib.sha1
 
         # Convert epoch time to a human-readable date and time
         timestamp = int(time())

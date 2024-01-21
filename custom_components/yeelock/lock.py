@@ -1,3 +1,4 @@
+"""Yeelock Lock."""
 import logging
 
 from homeassistant.components.lock import LockEntity
@@ -13,10 +14,9 @@ _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
-						
-					   
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ):
+    """Set up the Yeelock lock platform."""
     yeelock_device: Yeelock = hass.data[DOMAIN][entry.unique_id]
     lock_entity = YeelockLock(yeelock_device, hass)
     yeelock_device.lock_entity = lock_entity  # Pass the reference
@@ -25,7 +25,7 @@ async def async_setup_entry(
 
 
 class YeelockLock(YeelockDeviceEntity, LockEntity):
-    """This button locks the device"""
+    """This button locks the device."""
 
     _attr_name = "Lock"
     _attr_state = "locked"  # Assume locked state on load
@@ -51,12 +51,15 @@ class YeelockLock(YeelockDeviceEntity, LockEntity):
         return self._attr_state == "locked"
 
     async def _update_lock_state(self, new_state):
+        """Update the lock state."""
         _LOGGER.debug("Setting state to %s", new_state)
         self._attr_state = new_state
         self.async_write_ha_state()
 
     async def async_lock(self):
+        """Asynchronously lock."""
         await self.hass.async_create_task(self.device.lock())
 
     async def async_unlock(self):
+        """Asynchronously unlock."""
         await self.hass.async_create_task(self.device.unlock())
