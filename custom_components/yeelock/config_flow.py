@@ -17,6 +17,7 @@ from homeassistant.const import (
     CONF_PASSWORD,
     CONF_NAME,
     CONF_MAC,
+    CONF_MODEL,
     CONF_API_KEY,
 )
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
@@ -33,6 +34,7 @@ STEP_USER_DATA_SCHEMA = voluptuous.Schema(
         voluptuous.Required(CONF_PASSWORD): str,
         voluptuous.Required(CONF_NAME): str,
         voluptuous.Required(CONF_MAC): str,
+        voluptuous.Required(CONF_MODEL): str,
         voluptuous.Required(CONF_API_KEY): str,
     }
 )
@@ -136,6 +138,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                             user_input[CONF_API_KEY] = lock["ble_sign_key"]
                             user_input[CONF_MAC] = address
                             user_input[CONF_NAME] = lock["lock_name"]
+                            user_input[CONF_MODEL] = lock["lock_type"]
 
                             await self._session.close()
 

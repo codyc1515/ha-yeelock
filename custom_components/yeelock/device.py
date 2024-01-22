@@ -9,7 +9,7 @@ from time import time
 from bleak import BleakClient
 from bleak.exc import BleakError
 from homeassistant.components import bluetooth
-from homeassistant.const import CONF_API_KEY, CONF_MAC, CONF_NAME
+from homeassistant.const import CONF_API_KEY, CONF_MAC, CONF_MODEL, CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
@@ -40,7 +40,7 @@ class YeelockDeviceEntity:
             "identifiers": {(DOMAIN, self.device.mac)},
             "connections": {(dr.CONNECTION_NETWORK_MAC, self.device.mac)},
             "name": self.device.name,
-            "manufacturer": "Xiaomi",
+            "manufacturer": self.device.manufacturer,
             "model": self.device.model,
         }
 
@@ -60,7 +60,8 @@ class Yeelock:
         self.name = config.get(CONF_NAME)
         self.key = config.get(CONF_API_KEY)
         self.hostname = ""
-        self.model = "Yeelock"
+        self.manufacturer = "Yeelock"
+        self.model = config.get(CONF_MODEL, None)
         self.friendly_name = ""
         self.connected = False
         self.notify = False
