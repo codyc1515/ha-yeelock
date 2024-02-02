@@ -28,7 +28,6 @@ class YeelockLock(YeelockDeviceEntity, LockEntity):
     """This button locks the device."""
 
     _attr_name = "Lock"
-    _attr_state = "locked"  # Assume locked state on load
 
     @property
     def is_locking(self):
