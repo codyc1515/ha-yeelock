@@ -29,9 +29,9 @@ class YeelockDeviceEntity:
 
     def __init__(self, yeelock_device, hass: HomeAssistant):
         """Init entity with the device."""
-        self._attr_unique_id = f"{yeelock_device.mac}_{self.__class__.__name__}"
-        self.device: Yeelock = yeelock_device
         self.hass = hass
+        self.device: Yeelock = yeelock_device
+        self._attr_unique_id = f"{yeelock_device.mac}_{self.__class__.__name__}"
 
     @property
     def device_info(self):
@@ -50,23 +50,17 @@ class Yeelock:
 
     def __init__(self, config: dict, hass: HomeAssistant) -> None:
         """Initialize device."""
-        self._device_status = None
-        self._client = None
         self._hass = hass
         self._device = None
+        self._lock = None
+        self._client = None
         self._connecting = False
-        self.lock_entity = None
+        self._connected = False
         self.mac = config.get(CONF_MAC)
         self.name = config.get(CONF_NAME)
         self.key = config.get(CONF_API_KEY)
-        self.hostname = ""
-        self.manufacturer = "Yeelock"
         self.model = config.get(CONF_MODEL, None)
-        self.friendly_name = ""
-        self.connected = False
-        self.notify = False
-        self.service = 0
-        self.is_on = False
+        self.manufacturer = "Yeelock"
 
     async def disconnect(self):
         """Disconnect from the device."""
@@ -141,9 +135,9 @@ class Yeelock:
             await self.time_sync()
 
             # Retry the original action
-            if self.lock_entity._attr_state == "locking":
+            if self._lock._attr_state == "locking":
                 return await self.lock()
-            elif self.lock_entity._attr_state == "unlocking":
+            elif self._lock._attr_state == "unlocking":
                 return await self.unlock()
 
         # Invalid signing key
@@ -158,7 +152,7 @@ class Yeelock:
 
         # Update the lock state
         _LOGGER.debug("Notified of %s", new_state)
-        await self.lock_entity._update_lock_state(new_state)
+        await self._lock._update_lock_state(new_state)
 
     def _encrypt(self, unlock_mode):
         """Encrypt the data."""
@@ -233,7 +227,7 @@ class Yeelock:
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt("02"))
             )
         except BleakError as error:
-            self.connected = False
+            self._connected = False
             _LOGGER.error("BleakError: %s", error)
 
     async def unlock(self) -> None:
@@ -245,7 +239,7 @@ class Yeelock:
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt("01"))
             )
         except BleakError as error:
-            self.connected = False
+            self._connected = False
             _LOGGER.error("BleakError: %s", error)
 
     async def unlock_quick(self) -> None:
@@ -257,7 +251,7 @@ class Yeelock:
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt("00"))
             )
         except BleakError as error:
-            self.connected = False
+            self._connected = False
             _LOGGER.error("BleakError: %s", error)
 
     async def time_sync(self) -> None:
@@ -269,5 +263,5 @@ class Yeelock:
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt_time())
             )
         except BleakError as error:
-            self.connected = False
+            self._connected = False
             _LOGGER.error("BleakError: %s", error)
