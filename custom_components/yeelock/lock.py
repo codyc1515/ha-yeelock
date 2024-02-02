@@ -1,4 +1,5 @@
 """Yeelock Lock."""
+
 import logging
 
 from homeassistant.components.lock import LockEntity
@@ -57,8 +58,8 @@ class YeelockLock(YeelockDeviceEntity, LockEntity):
 
     async def async_lock(self):
         """Asynchronously lock."""
-        await self.device.locker('lock')
+        await self.device.locker("lock")
 
     async def async_unlock(self):
         """Asynchronously unlock."""
-        await self.device.locker('unlock')
+        await self.device.locker("unlock")

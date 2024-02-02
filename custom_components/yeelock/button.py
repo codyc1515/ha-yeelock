@@ -1,4 +1,5 @@
 """Yeelock button."""
+
 from homeassistant.components.button import ButtonEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory

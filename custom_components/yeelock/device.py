@@ -1,4 +1,5 @@
 """Yeelock device."""
+
 import hashlib
 import hmac
 import logging
@@ -13,7 +14,7 @@ from homeassistant.const import CONF_API_KEY, CONF_MAC, CONF_MODEL, CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, LOCKER_KIND, UUID_BATTERY_LEVEL, UUID_COMMAND, UUID_NOTIFY
+from .const import DOMAIN, LOCKER_KIND, UUID_COMMAND, UUID_NOTIFY
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -229,9 +230,9 @@ class Yeelock:
 
             # Retry the original action
             if self._lock._attr_state == "locking":
-                await self.locker('lock')
+                await self.locker("lock")
             elif self._lock._attr_state == "unlocking":
-                await self.locker('unlock')
+                await self.locker("unlock")
         except BleakError as error:
             self._connected = False
             _LOGGER.error("BleakError: %s", error)

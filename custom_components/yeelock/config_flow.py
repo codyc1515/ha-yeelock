@@ -1,4 +1,5 @@
 """Config flow for the Yeelock integration."""
+
 from __future__ import annotations
 
 import aiohttp
@@ -56,7 +57,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, discovery_info: BluetoothServiceInfoBleak
     ) -> FlowResult:
         """Handle the bluetooth discovery step."""
-        _LOGGER.debug('Starting bluetooth step')
+        _LOGGER.debug("Starting bluetooth step")
 
         await self.async_set_unique_id(discovery_info.address)
         self._abort_if_unique_id_configured()
@@ -77,7 +78,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             }
         )
 
-        _LOGGER.debug('Handoff to cloud step')
+        _LOGGER.debug("Handoff to cloud step")
         return await self.async_step_cloud()
 
     async def async_step_cloud(
@@ -87,21 +88,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            _LOGGER.debug('Starting user login')
+            _LOGGER.debug("Starting user login")
 
             if self._discovery_info and self._discovery_info.address:
                 address = self._discovery_info.address
             else:
-                _LOGGER.debug('Integration must be set-up from auto-discovery')
+                _LOGGER.debug("Integration must be set-up from auto-discovery")
                 return self.async_abort(reason="no_devices_found")
 
-            await self.async_set_unique_id(
-                address, raise_on_progress=False
-            )
+            await self.async_set_unique_id(address, raise_on_progress=False)
             self._abort_if_unique_id_configured()
 
             # Get OAuth token
-            _LOGGER.debug('Get token')
+            _LOGGER.debug("Get token")
             login = await self._api_wrapper(
                 method="post",
                 url="https://api.yeeloc.com/oauth/access_token",
@@ -115,25 +114,26 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 },
                 headers={
                     "content-type": "application/x-www-form-urlencoded; charset=UTF-8"
-                }
+                },
             )
 
             try:
                 if login["access_token"]:
                     # Get locks
-                    _LOGGER.debug('Get locks')
+                    _LOGGER.debug("Get locks")
                     locks = await self._api_wrapper(
                         method="get",
                         url="https://api.yeeloc.com/lock",
-                        headers={
-                            "Authorization": "Bearer " + login["access_token"]
-                        },
+                        headers={"Authorization": "Bearer " + login["access_token"]},
                     )
 
                     _LOGGER.debug(locks)
                     for lock in locks:
-                        if self._discovery_info.name.removeprefix("EL_") == lock["lock_sn"]:
-                            _LOGGER.debug('Found lock and key')
+                        if (
+                            self._discovery_info.name.removeprefix("EL_")
+                            == lock["lock_sn"]
+                        ):
+                            _LOGGER.debug("Found lock and key")
 
                             user_input[CONF_API_KEY] = lock["ble_sign_key"]
                             user_input[CONF_MAC] = address
@@ -151,10 +151,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             except KeyError:
                 errors["base"] = "unknown"
 
-            _LOGGER.warning('Failed cloud login')
+            _LOGGER.warning("Failed cloud login")
             return self.async_show_form(step_id="cloud", data_schema=self._schema)
         else:
-            _LOGGER.debug('Showing cloud form')
+            _LOGGER.debug("Showing cloud form")
             return self.async_show_form(
                 step_id="cloud", data_schema=self._schema, errors=errors
             )
@@ -163,7 +163,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle the initial step."""
-        _LOGGER.debug('Integration must be set-up from auto-discovery')
+        _LOGGER.debug("Integration must be set-up from auto-discovery")
         return self.async_abort(reason="no_devices_found")
 
     async def _api_wrapper(
@@ -198,9 +198,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "Timeout error fetching information: %s", exception
             ) from exception
         except (aiohttp.ClientError, socket.gaierror) as exception:
-            raise Exception(
-                "Error fetching information: %s", exception
-            ) from exception
+            raise Exception("Error fetching information: %s", exception) from exception
         except Exception as exception:  # pylint: disable=broad-except
             raise Exception(
                 "Something really wrong happened! %s", exception

@@ -1,4 +1,5 @@
 """Constants for the Yeelock integration."""
+
 from homeassistant.const import Platform
 
 DOMAIN = "yeelock"
