@@ -13,11 +13,8 @@ from homeassistant.const import CONF_API_KEY, CONF_MAC, CONF_MODEL, CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN
+from .const import DOMAIN, UUID_BATTERY_LEVEL, UUID_COMMAND, UUID_NOTIFY
 
-UUID_BATTERY_LEVEL = "00002a19-0000-1000-8000-00805f9b34fb"
-UUID_COMMAND = "58af3dca-6fc0-4fa3-9464-74662f043a3b"
-UUID_NOTIFY = "58af3dca-6fc0-4fa3-9464-74662f043a3a"
 
 _LOGGER = logging.getLogger(__name__)
 
