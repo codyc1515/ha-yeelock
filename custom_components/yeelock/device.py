@@ -103,9 +103,6 @@ class Yeelock:
         # Extract the first element (index 0) and convert it to an integer
         first_byte = hex(int(received_message.split()[0], 16))
 
-        # Set a default just in case
-        new_state = "jammed"
-
         # Lock change successes
         # Unlocking
         if first_byte == hex(0x2):
@@ -124,32 +121,25 @@ class Yeelock:
             new_state = "locked"
 
         # Lock change failures
-        # Time needs to be synced
-        elif first_byte == hex(0x9):
-            _LOGGER.warning("Time needs to be synced")
-
-            # Perform time sync
-            await self.time_sync()
-
-            # Retry the original action
-            if self._lock._attr_state == "locking":
-                return await self.lock()
-            elif self._lock._attr_state == "unlocking":
-                return await self.unlock()
-
         # Invalid signing key
         elif first_byte == hex(0xFF):
             _LOGGER.error("Invalid signing key")
             new_state = "jammed"
+
+        # Time needs to be synced
+        elif first_byte == hex(0x9):
+            _LOGGER.warning("Time needs to be synced")
+            await self.time_sync()
 
         # Unknown error
         else:
             _LOGGER.error("Unknown notification received")
             new_state = "jammed"
 
-        # Update the lock state
-        _LOGGER.debug("Notified of %s", new_state)
-        await self._lock._update_lock_state(new_state)
+        # Update to the new lock state, if we have one
+        if new_state:
+            _LOGGER.debug("Notified of %s", new_state)
+            await self._lock._update_lock_state(new_state)
 
     def _encrypt(self, unlock_mode):
         """Encrypt the data."""
@@ -252,13 +242,20 @@ class Yeelock:
             _LOGGER.error("BleakError: %s", error)
 
     async def time_sync(self) -> None:
-        """Time sync."""
+        """Time sync and retry."""
         await self._connect()
         try:
+            # Sync the time
             _LOGGER.debug("Time sync start")
             await self._client.write_gatt_char(
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt_time())
             )
+
+            # Retry the original action
+            if self._lock._attr_state == "locking":
+                await self.lock()
+            elif self._lock._attr_state == "unlocking":
+                await self.unlock()
         except BleakError as error:
             self._connected = False
             _LOGGER.error("BleakError: %s", error)
