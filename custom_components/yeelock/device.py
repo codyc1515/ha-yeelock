@@ -13,7 +13,7 @@ from homeassistant.const import CONF_API_KEY, CONF_MAC, CONF_MODEL, CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, UUID_BATTERY_LEVEL, UUID_COMMAND, UUID_NOTIFY
+from .const import DOMAIN, LOCKER_KIND, UUID_BATTERY_LEVEL, UUID_COMMAND, UUID_NOTIFY
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -205,37 +205,13 @@ class Yeelock:
         _LOGGER.debug("Sent time sync msg %s", output_value)
         return output_value
 
-    async def lock(self) -> None:
-        """Lock the device."""
+    async def locker(self, kind) -> None:
+        """Lock, unlock and quick unlock the device."""
         await self._connect()
         try:
             _LOGGER.debug("Locking")
             await self._client.write_gatt_char(
-                uuid.UUID(UUID_COMMAND), bytearray(self._encrypt("02"))
-            )
-        except BleakError as error:
-            self._connected = False
-            _LOGGER.error("BleakError: %s", error)
-
-    async def unlock(self) -> None:
-        """Unlock the device."""
-        await self._connect()
-        try:
-            _LOGGER.debug("Unlocking")
-            await self._client.write_gatt_char(
-                uuid.UUID(UUID_COMMAND), bytearray(self._encrypt("01"))
-            )
-        except BleakError as error:
-            self._connected = False
-            _LOGGER.error("BleakError: %s", error)
-
-    async def unlock_quick(self) -> None:
-        """Unlock the device then relock again quickly."""
-        await self._connect()
-        try:
-            _LOGGER.debug("Unlocking the device then relocking again quickly")
-            await self._client.write_gatt_char(
-                uuid.UUID(UUID_COMMAND), bytearray(self._encrypt("00"))
+                uuid.UUID(UUID_COMMAND), bytearray(self._encrypt(LOCKER_KIND[kind]))
             )
         except BleakError as error:
             self._connected = False
@@ -253,9 +229,9 @@ class Yeelock:
 
             # Retry the original action
             if self._lock._attr_state == "locking":
-                await self.lock()
+                await self.locker('lock')
             elif self._lock._attr_state == "unlocking":
-                await self.unlock()
+                await self.locker('unlock')
         except BleakError as error:
             self._connected = False
             _LOGGER.error("BleakError: %s", error)

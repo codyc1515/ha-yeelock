@@ -57,8 +57,8 @@ class YeelockLock(YeelockDeviceEntity, LockEntity):
 
     async def async_lock(self):
         """Asynchronously lock."""
-        await self.device.lock()
+        await self.device.locker('lock')
 
     async def async_unlock(self):
         """Asynchronously unlock."""
-        await self.device.unlock()
+        await self.device.locker('unlock')
