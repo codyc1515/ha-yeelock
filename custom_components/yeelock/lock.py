@@ -18,10 +18,10 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ):
     """Set up the Yeelock lock platform."""
-    yeelock_device: Yeelock = hass.data[DOMAIN][entry.unique_id]
-    lock_entity = YeelockLock(yeelock_device, hass)
-    yeelock_device.lock_entity = lock_entity  # Pass the reference
-    async_add_entities([lock_entity])
+    device: Yeelock = hass.data[DOMAIN][entry.unique_id]
+    lock = YeelockLock(device, hass)
+    device._lock = lock  # Pass the reference
+    async_add_entities([lock])
     return True
 
 
