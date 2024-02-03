@@ -72,4 +72,4 @@ class YeelockLock(YeelockDeviceEntity, LockEntity):
 
     async def async_open(self):
         """Open the door quickly."""
-        return await self.device.locker("unlock_quick")
+        await self.device.locker("unlock_quick")
