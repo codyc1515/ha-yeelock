@@ -132,10 +132,9 @@ class Yeelock:
             _LOGGER.warning("Time needs to be synced")
             await self.time_sync()
 
-        # Unknown error
+        # Unknown notification received
         else:
-            _LOGGER.error("Unknown notification received")
-            #new_state = "jammed"
+            _LOGGER.warning("Unknown notification received")
 
         # Update to the new lock state, if we have one
         if new_state:
