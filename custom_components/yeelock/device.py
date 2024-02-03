@@ -97,6 +97,7 @@ class Yeelock:
     async def _handle_data(self, sender, value):
         """Handle data notifications."""
         _LOGGER.debug("Received %s from %s", hexlify(value, " "), sender)  # noqa: E501
+        new_state = None
 
         # Hex the received message
         received_message = hexlify(value, " ")
@@ -137,7 +138,7 @@ class Yeelock:
             _LOGGER.warning("Unknown notification received")
 
         # Update to the new lock state, if we have one
-        if new_state:
+        if new_state is not None:
             _LOGGER.debug("Notified of %s", new_state)
             await self._lock._update_lock_state(new_state)
 
