@@ -135,7 +135,7 @@ class Yeelock:
         # Unknown error
         else:
             _LOGGER.error("Unknown notification received")
-            new_state = "jammed"
+            #new_state = "jammed"
 
         # Update to the new lock state, if we have one
         if new_state:
