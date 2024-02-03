@@ -2,7 +2,7 @@
 
 import logging
 
-from homeassistant.components.lock import LockEntity
+from homeassistant.components.lock import LockEntity, LockEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -29,6 +29,7 @@ class YeelockLock(YeelockDeviceEntity, LockEntity):
     """This button locks the device."""
 
     _attr_name = "Lock"
+    _attr_supported_features = LockEntityFeature.OPEN
 
     @property
     def is_locking(self):
@@ -63,3 +64,7 @@ class YeelockLock(YeelockDeviceEntity, LockEntity):
     async def async_unlock(self):
         """Asynchronously unlock."""
         await self.device.locker("unlock")
+
+    async def async_open(self):
+        """Open the door quickly."""
+        return await self.device.locker("unlock_quick")
