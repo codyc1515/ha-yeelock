@@ -32,7 +32,7 @@ class YeelockQuickUnlockButton(YeelockDeviceEntity, ButtonEntity):
 
     async def async_press(self):
         """Handle button pressses."""
-        self.hass.async_create_task(self.device.unlock_quick())
+        self.hass.async_create_task(self.device.locker('quick_unlock'))
 
 
 class YeelockTimeSyncButton(YeelockDeviceEntity, ButtonEntity):
