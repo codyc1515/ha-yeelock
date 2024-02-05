@@ -48,7 +48,7 @@ Copy all files in the `custom_components`/`yeelock` folder to your Home Assistan
 5. To use the automatic re-lock, tap the button underneath the lock / unlock toggle.
 
 ## Known issues
-- None known.
+- Signing in to this integration may sign you out of the Yeelock app automatically. We have no control over this, so you may need to sign back in to the Yeelock app afterwards. You can continue to _also_ use the Yeelock app if you would prefer, too.
 
 ## Future enhancements
 Your support is welcomed.
