@@ -48,7 +48,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         """Initialize Yeelock config flow."""
-        self._session = aiohttp.ClientSession()
+        self._session = None  # Avoids unclosed client session
         self._schema = STEP_USER_DATA_SCHEMA
         self._discovery_info: BluetoothServiceInfoBleak | None = None
         self._discovered_devices: dict[str, BluetoothServiceInfoBleak] = {}
@@ -176,6 +176,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         headers: dict | None = None,
     ) -> any:
         """Get information from the API."""
+        if self._session is None:
+            self._session = aiohttp.ClientSession()
+
         try:
             async with async_timeout.timeout(10):
                 response = await self._session.request(
