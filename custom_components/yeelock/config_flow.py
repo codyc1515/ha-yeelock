@@ -14,7 +14,7 @@ import voluptuous
 from bluetooth_data_tools import human_readable_name
 from homeassistant import config_entries
 from homeassistant.const import (
-    CONF_COUNTRY_CODE,
+    CONF_EMAIL,
     CONF_PASSWORD,
     CONF_NAME,
     CONF_MAC,
@@ -24,14 +24,13 @@ from homeassistant.const import (
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import CONF_PHONE, DOMAIN
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = voluptuous.Schema(
     {
-        voluptuous.Required(CONF_COUNTRY_CODE): str,
-        voluptuous.Required(CONF_PHONE): str,
+        voluptuous.Required(CONF_EMAIL): str,
         voluptuous.Required(CONF_PASSWORD): str,
         voluptuous.Required(CONF_NAME): str,
         voluptuous.Required(CONF_MAC): str,
@@ -72,8 +71,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         self._schema = voluptuous.Schema(
             {
-                voluptuous.Required(CONF_COUNTRY_CODE): str,
-                voluptuous.Required(CONF_PHONE): str,
+                voluptuous.Required(CONF_EMAIL): str,
                 voluptuous.Required(CONF_PASSWORD): str,
             }
         )
@@ -103,14 +101,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             _LOGGER.debug("Get token")
             login = await self._api_wrapper(
                 method="post",
-                url="https://api.yeeloc.com/oauth/access_token",
+                url="https://api.yeeloc.com/v2/auth/by/password",
                 params={
-                    "grant_type": "password",
-                    "client_id": "yeeloc",
-                    "client_secret": "adb03414981961952ccf40a1b4031d12",
-                    "username": user_input[CONF_PHONE],
+                    "account": user_input[CONF_EMAIL],
                     "password": user_input[CONF_PASSWORD],
-                    "zone": user_input[CONF_COUNTRY_CODE],
                 },
                 headers={
                     "content-type": "application/x-www-form-urlencoded; charset=UTF-8"
@@ -118,13 +112,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
 
             try:
-                if login["access_token"]:
+                if login.get("data").get("access_token"):
+                    access_token = login.get("data").get("access_token")
                     # Get locks
                     _LOGGER.debug("Get locks")
                     locks = await self._api_wrapper(
                         method="get",
                         url="https://api.yeeloc.com/lock",
-                        headers={"Authorization": "Bearer " + login["access_token"]},
+                        headers={"Authorization": "Bearer " + access_token},
                     )
 
                     _LOGGER.debug(locks)

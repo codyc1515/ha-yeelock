@@ -14,8 +14,7 @@
 				"title": "Yeelock",
 				"description": "Devices must be set-up in the Yeelock app first (requires an account).",
 				"data": {
-					"country_code": "Country Code",
-					"phone": "Phone Number",
+					"email": "E-Mail (login)",
 					"password": "Password",
 					"name": "Name",
 					"mac": "MAC Address",
