@@ -50,6 +50,9 @@ Copy all files in the `custom_components`/`yeelock` folder to your Home Assistan
 ## Known issues
 - Signing in to this integration may sign you out of the Yeelock app automatically. We have no control over this, so you may need to sign back in to the Yeelock app afterwards. You can continue to _also_ use the Yeelock app if you would prefer, too.
 
+## Troubleshooting
+- Autodiscovery did not work and `No devices found on the network` after trying to manually add integration, when using ESPHome proxy: make sure that you don't have `active: false` (defaults to `true`) under `esp32_ble_tracker` section. Passive scanning doesn't detect device names (so autodiscovery won't work), but also connecting to lock will not be possible.
+
 ## Future enhancements
 Your support is welcomed.
 
