@@ -1,0 +1,27 @@
+{
+	"config": {
+		"abort": {
+			"already_configured": "Equipamento já configurado",
+			"no_devices_found": "Não foram encontrados equipamentos na rede"
+		},
+		"error": {
+			"cannot_connect": "Falha na ligação",
+			"invalid_auth": "Autenticação invalida",
+			"unknown": "Erro desconhecido"
+		},
+		"step": {
+			"cloud": {
+				"title": "Yeelock",
+				"description": "Os esquipamentos tem que ser configurados primeiro na Yeelock app (Obrigatório Conta).",
+				"data": {
+					"country_code": "Código de País",
+					"phone": "Número de telefone",
+					"password": "Senha",
+					"name": "Nome",
+					"mac": "Endereço MAC",
+					"api_key": "Chave de API"
+				}
+			}
+		}
+	}
+}
