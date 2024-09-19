@@ -6,6 +6,7 @@ from homeassistant.components.lock import LockEntity, LockEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN
 from .device import Yeelock, YeelockDeviceEntity
@@ -25,11 +26,18 @@ async def async_setup_entry(
     return True
 
 
-class YeelockLock(YeelockDeviceEntity, LockEntity):
+class YeelockLock(YeelockDeviceEntity, LockEntity, RestoreEntity):
     """This button locks the device."""
 
     _attr_name = "Lock"
     _attr_supported_features = LockEntityFeature.OPEN
+
+    async def async_added_to_hass(self):
+        """Call when entity is added to hass."""
+        await super().async_added_to_hass()
+        state = await self.async_get_last_state()
+        if state:
+            self._attr_state = state.state
 
     @property
     def code_format(self):
