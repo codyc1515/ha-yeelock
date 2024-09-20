@@ -44,7 +44,7 @@ Copy all files in the `custom_components`/`yeelock` folder to your Home Assistan
 ## Configuration
 1. Setup your Yeelock first in the Yeelock app. You will need the QR code that came in the box to do this.
 3. Once the integration is installed & you have restarted Home Assistant, your Yeelock will be detected & shown automatically on the `Devices and services` page.
-4. You will need to input your phone's country code, phone number (without leading zero) and Yeelock account password.
+4. You will need to input your email (login) and Yeelock account password.
 5. To use the automatic re-lock, tap the button underneath the lock / unlock toggle.
 
 ## Known issues
