@@ -30,6 +30,7 @@ class YeelockDeviceEntity:
         self.hass = hass
         self.device: Yeelock = yeelock_device
         self._attr_unique_id = f"{yeelock_device.mac}_{self.__class__.__name__}"
+        self._last_action = None  # Track last requested action
 
     @property
     def device_info(self):
@@ -132,10 +133,14 @@ class Yeelock:
         elif first_byte == hex(0x9):
             _LOGGER.warning("Time needs to be synced")
             await self.time_sync()
+            if self._last_action:
+                _LOGGER.warning("Retrying last action: %s", self._last_action)
+                await self.locker(self._last_action)
+                self._last_action = None
 
         # Unknown notification received
         else:
-            _LOGGER.warning("Unknown notification received")
+            _LOGGER.warning("Unknown notification received (%s)", first_byte)
 
         # Update to the new lock state, if we have one
         if new_state is not None:
@@ -208,6 +213,7 @@ class Yeelock:
 
     async def locker(self, kind) -> None:
         """Lock, unlock and quick unlock the device."""
+        self._last_action = kind  # Save action before attempting
         await self._connect()
         try:
             _LOGGER.debug("Locking")
@@ -227,12 +233,6 @@ class Yeelock:
             await self._client.write_gatt_char(
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt_time())
             )
-
-            # Retry the original action
-            if self._lock._attr_state == "locking":
-                await self.locker("lock")
-            elif self._lock._attr_state == "unlocking":
-                await self.locker("unlock")
         except BleakError as error:
             self._connected = False
             _LOGGER.error("BleakError: %s", error)
