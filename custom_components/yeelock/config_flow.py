@@ -36,9 +36,12 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+CONF_ACCOUNT_TYPE = "account_type"
+ACCOUNT_TYPE_EMAIL = "email"
+ACCOUNT_TYPE_PHONE = "phone"
+
 STEP_USER_DATA_SCHEMA = voluptuous.Schema(
     {
-        voluptuous.Required(CONF_COUNTRY_CODE): str,
         voluptuous.Required(CONF_PHONE): str,
         voluptuous.Required(CONF_PASSWORD): str,
         voluptuous.Required(CONF_NAME): str,
@@ -67,6 +70,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._schema = STEP_USER_DATA_SCHEMA
         self._discovery_info: BluetoothServiceInfoBleak | None = None
         self._discovered_devices: dict[str, BluetoothServiceInfoBleak] = {}
+        self._account_type: str = ACCOUNT_TYPE_EMAIL
 
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
@@ -85,6 +89,62 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
         }
 
+        _LOGGER.debug("Handoff to account type step")
+        return await self.async_step_account_type()
+
+    async def async_step_account_type(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Ask whether the user signs in with email or phone."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            self._account_type = user_input[CONF_ACCOUNT_TYPE]
+            if self._account_type == ACCOUNT_TYPE_PHONE:
+                return await self.async_step_cloud_phone()
+            return await self.async_step_cloud_email()
+
+        return self.async_show_form(
+            step_id="account_type",
+            data_schema=voluptuous.Schema(
+                {
+                    voluptuous.Required(
+                        CONF_ACCOUNT_TYPE, default=ACCOUNT_TYPE_EMAIL
+                    ): voluptuous.In(
+                        {
+                            ACCOUNT_TYPE_EMAIL: "Email",
+                            ACCOUNT_TYPE_PHONE: "Phone number",
+                        }
+                    ),
+                }
+            ),
+            errors=errors,
+        )
+
+    async def async_step_cloud_email(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle email account credentials."""
+        self._schema = voluptuous.Schema(
+            {
+                voluptuous.Required(CONF_PHONE): str,
+                voluptuous.Required(CONF_PASSWORD): str,
+                voluptuous.Required(
+                    CONF_AUTO_UNLOCK_LOW_BATTERY,
+                    default=DEFAULT_AUTO_UNLOCK_LOW_BATTERY,
+                ): bool,
+                voluptuous.Required(
+                    CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+                    default=DEFAULT_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+                ): voluptuous.All(cv.positive_int, voluptuous.Range(min=1, max=100)),
+            }
+        )
+        return await self._async_step_cloud(user_input, is_phone=False)
+
+    async def async_step_cloud_phone(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle phone account credentials."""
         self._schema = voluptuous.Schema(
             {
                 voluptuous.Required(CONF_COUNTRY_CODE): str,
@@ -100,14 +160,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ): voluptuous.All(cv.positive_int, voluptuous.Range(min=1, max=100)),
             }
         )
+        return await self._async_step_cloud(user_input, is_phone=True)
 
-        _LOGGER.debug("Handoff to cloud step")
-        return await self.async_step_cloud()
-
-    async def async_step_cloud(
-        self, user_input: dict[str, Any] | None = None
+    async def _async_step_cloud(
+        self, user_input: dict[str, Any] | None, is_phone: bool
     ) -> FlowResult:
-        """Handle the initial step."""
+        """Authenticate and discover device."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
@@ -122,51 +180,61 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             await self.async_set_unique_id(address, raise_on_progress=False)
             self._abort_if_unique_id_configured()
 
+            account = user_input[CONF_PHONE]
+            if is_phone:
+                account = f"{user_input[CONF_COUNTRY_CODE]} {user_input[CONF_PHONE]}"
+
             try:
                 login = await self._api_wrapper(
                     method="post",
-                    url="https://api.yeeloc.com/oauth/access_token",
-                    params={
-                        "grant_type": "password",
-                        "client_id": "yeeloc",
-                        "client_secret": "adb03414981961952ccf40a1b4031d12",
-                        "username": user_input[CONF_PHONE],
+                    url="https://api.yeeloc.com/v2/auth/by/password",
+                    data={
+                        "account": account,
                         "password": user_input[CONF_PASSWORD],
-                        "zone": user_input[CONF_COUNTRY_CODE],
                     },
                     headers={
-                        "content-type": "application/x-www-form-urlencoded; charset=UTF-8"
+                        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+                        "Accept": "*/*",
                     },
                 )
-                token = login.get("access_token")
+                token = login.get("data", {}).get("access_token")
                 if not token:
                     errors["base"] = "invalid_auth"
                     return self.async_show_form(
-                        step_id="cloud", data_schema=self._schema, errors=errors
+                        step_id="cloud_phone" if is_phone else "cloud_email",
+                        data_schema=self._schema,
+                        errors=errors,
                     )
 
                 # Get locks
                 _LOGGER.debug("Get locks")
-                locks = await self._api_wrapper(
+                locks_response = await self._api_wrapper(
                     method="get",
-                    url="https://api.yeeloc.com/lock",
-                    headers={"Authorization": f"Bearer {token}"},
+                    url="https://api.yeeloc.com/v2/user/device/list",
+                    params={"group_id": -1},
+                    headers={
+                        "Accept": "*/*",
+                        "Authorization": token,
+                    },
                 )
 
-                _LOGGER.debug(locks)
+                locks = locks_response.get("data", [])
+                _LOGGER.debug(locks_response)
                 for lock in locks:
-                    if self._discovery_info.name.removeprefix("EL_") == lock["lock_sn"]:
+                    if self._discovery_info.name.removeprefix("EL_") == lock["sn"]:
                         _LOGGER.debug("Found lock and key")
 
                         user_input[CONF_API_KEY] = lock["ble_sign_key"]
                         user_input[CONF_MAC] = address
-                        user_input[CONF_NAME] = lock["lock_name"]
-                        user_input[CONF_MODEL] = lock["lock_type"]
+                        user_input[CONF_NAME] = lock["name"]
+                        user_input[CONF_MODEL] = lock["type"]
 
                         return self.async_create_entry(
                             title=user_input[CONF_NAME], data=user_input
                         )
                 errors["base"] = "cannot_connect"
+            except YeelockAccountNotRegisteredError:
+                errors["base"] = "account_not_registered"
             except YeelockAuthError:
                 errors["base"] = "invalid_auth"
             except YeelockApiError:
@@ -174,12 +242,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             _LOGGER.warning("Failed cloud login")
             return self.async_show_form(
-                step_id="cloud", data_schema=self._schema, errors=errors
+                step_id="cloud_phone" if is_phone else "cloud_email",
+                data_schema=self._schema,
+                errors=errors,
             )
         else:
             _LOGGER.debug("Showing cloud form")
             return self.async_show_form(
-                step_id="cloud", data_schema=self._schema, errors=errors
+                step_id="cloud_phone" if is_phone else "cloud_email",
+                data_schema=self._schema,
+                errors=errors,
             )
 
     async def async_step_user(
@@ -214,7 +286,22 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 if response.status in (400, 401, 403):
                     raise YeelockAuthError
                 response.raise_for_status()
-                return await response.json()
+                response_json = await response.json()
+
+                if isinstance(response_json, dict) and response_json.get("code") == 401:
+                    raise YeelockAuthError
+
+                if isinstance(response_json, dict) and response_json.get("code") == 1009:
+                    raise YeelockAccountNotRegisteredError
+
+                if isinstance(response_json, dict) and response_json.get(
+                    "code"
+                ) not in (None, 0):
+                    raise YeelockApiError(
+                        response_json.get("message", "Error fetching information")
+                    )
+
+                return response_json
 
         except TimeoutError as exception:
             raise YeelockApiError("Timeout error fetching information") from exception
@@ -228,6 +315,10 @@ class YeelockApiError(Exception):
 
 class YeelockAuthError(YeelockApiError):
     """Raised when authentication with the Yeelock cloud fails."""
+
+
+class YeelockAccountNotRegisteredError(YeelockAuthError):
+    """Raised when the Yeelock account has not been registered."""
 
 
 class YeelockOptionsFlow(config_entries.OptionsFlowWithReload):
