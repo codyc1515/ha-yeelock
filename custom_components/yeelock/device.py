@@ -236,8 +236,8 @@ class Yeelock:
 
     async def update_battery(self) -> None:
         """Request battery level from the lock over BLE."""
-        await self._connect()
         try:
+            await self._connect()
             _LOGGER.debug("Requesting battery level")
             await self._client.write_gatt_char(
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt_battery())
@@ -245,3 +245,6 @@ class Yeelock:
         except BleakError as error:
             self._connected = False
             _LOGGER.error("BleakError: %s", error)
+        except Exception as error:  # pragma: no cover - backend-specific transient failures
+            self._connected = False
+            _LOGGER.warning("Unable to update battery for %s: %s", self.mac, error)
