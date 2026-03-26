@@ -34,6 +34,7 @@ class YeelockBatterySensor(YeelockDeviceEntity, SensorEntity):
     """Yeelock battery level sensor."""
 
     _attr_name = "Battery"
+    _attr_should_poll = False
     _attr_native_unit_of_measurement = PERCENTAGE
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -43,10 +44,6 @@ class YeelockBatterySensor(YeelockDeviceEntity, SensorEntity):
         await super().async_added_to_hass()
         if self.device.battery_level is not None:
             self._attr_native_value = self.device.battery_level
-        await self.device.update_battery()
-
-    async def async_update(self) -> None:
-        """Update battery level."""
         await self.device.update_battery()
 
     async def _update_battery_level(self, new_level: int) -> None:
