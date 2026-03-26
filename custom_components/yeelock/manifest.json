@@ -23,5 +23,8 @@
 	"integration_type": "device",
 	"iot_class": "local_push",
 	"issue_tracker": "https://github.com/codyc1515/ha-yeelock/issues",
-	"version": "2.2.0"
+	"version": "2.2.0",
+	"requirements": [
+		"bleak-retry-connector"
+	]
 }

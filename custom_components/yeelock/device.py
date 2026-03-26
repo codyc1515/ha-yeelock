@@ -9,6 +9,7 @@ from time import time
 
 from bleak import BleakClient
 from bleak.exc import BleakError
+from bleak_retry_connector import establish_connection
 from homeassistant.components import bluetooth
 from homeassistant.const import CONF_API_KEY, CONF_MAC, CONF_MODEL, CONF_NAME
 from homeassistant.core import HomeAssistant
@@ -84,10 +85,14 @@ class Yeelock:
                     raise BleakError(
                         f"A device with address {self.mac} could not be found."
                     )
-                self._client = BleakClient(self._device)
                 _LOGGER.debug("Connecting to %s", self.mac)
-                await self._client.connect()
-                _LOGGER.debug("Connected", self.mac)
+                self._client = await establish_connection(
+                    BleakClient,
+                    self._device,
+                    self.mac,
+                    max_attempts=3,
+                )
+                _LOGGER.debug("Connected to %s", self.mac)
                 await self._client.start_notify(
                     uuid.UUID(UUID_NOTIFY), self._handle_data
                 )
