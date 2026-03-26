@@ -52,6 +52,7 @@ class Yeelock:
         self._hass = hass
         self._device = None
         self._lock = None
+        self._battery_sensor = None
         self._client = None
         self._connecting = False
         self._connected = False
@@ -60,6 +61,7 @@ class Yeelock:
         self.key = config.get(CONF_API_KEY)
         self.model = config.get(CONF_MODEL, None)
         self.manufacturer = "Yeelock"
+        self.battery_level = None
 
     async def disconnect(self):
         """Disconnect from the device."""
@@ -138,6 +140,16 @@ class Yeelock:
                 await self.locker(self._last_action)
                 self._last_action = None
 
+        # Battery response notification
+        elif first_byte == hex(0x7):
+            if len(value) > 6:
+                self.battery_level = value[6]
+                _LOGGER.debug("Received battery level: %s%%", self.battery_level)
+                if self._battery_sensor is not None:
+                    await self._battery_sensor._update_battery_level(self.battery_level)
+            else:
+                _LOGGER.warning("Battery notification too short: %s", received_message)
+
         # Unknown notification received
         else:
             _LOGGER.warning("Unknown notification received (%s)", first_byte)
@@ -147,68 +159,49 @@ class Yeelock:
             _LOGGER.debug("Notified of %s", new_state)
             await self._lock._update_lock_state(new_state)
 
-    def _encrypt(self, unlock_mode):
-        """Encrypt the data."""
-        # Given values
-        unlock_command = 0x01
-        admin_identification_mode = 0x50
-        key = bytearray.fromhex(self.key)
+    def _encrypt_command(
+        self, command: int, admin_identification_mode: int, payload: bytes = b""
+    ) -> bytes:
+        """Encrypt a command packet.
 
-        # Convert epoch time to a human-readable date and time
+        The protocol frames are 20 bytes long and include:
+        command + admin mode + timestamp + optional payload + HMAC-SHA1 fragment.
+        """
+        key = bytearray.fromhex(self.key)
         timestamp = int(time())
 
-        # Generate the HMAC
         message = (
-            unlock_command.to_bytes(1, "big")
+            command.to_bytes(1, "big")
             + admin_identification_mode.to_bytes(1, "big")
             + timestamp.to_bytes(4, "big")
-            + int(unlock_mode, 16).to_bytes(1, "big")
+            + payload
         )
+        signature_length = 20 - len(message)
         hmac_result = bytearray.fromhex(
-            hmac.new(key, message[:7], hashlib.sha1).hexdigest()
-        )[:13]
+            hmac.new(key, message, hashlib.sha1).hexdigest()
+        )[:signature_length]
+        return message + hmac_result
 
-        # Concatenate all the parts to create the output value as a bytearray
-        output_value = (
-            unlock_command.to_bytes(1, "big")
-            + admin_identification_mode.to_bytes(1, "big")
-            + timestamp.to_bytes(4, "big")
-            + int(unlock_mode, 16).to_bytes(1, "big")
-            + hmac_result
+    def _encrypt(self, unlock_mode):
+        """Encrypt lock and unlock command packets."""
+        output_value = self._encrypt_command(
+            command=0x01,
+            admin_identification_mode=0x50,
+            payload=int(unlock_mode, 16).to_bytes(1, "big"),
         )
-
         _LOGGER.debug("Sent transactional msg %s", output_value)
         return output_value
 
     def _encrypt_time(self):
-        """Encrypt the time."""
-        # Given values
-        unlock_command = 0x08
-        admin_identification_mode = 0x40
-        key = bytearray.fromhex(self.key)
-
-        # Convert epoch time to a human-readable date and time
-        timestamp = int(time())
-
-        # Generate the HMAC
-        message = (
-            unlock_command.to_bytes(1, "big")
-            + admin_identification_mode.to_bytes(1, "big")
-            + timestamp.to_bytes(4, "big")
-        )
-        hmac_result = bytearray.fromhex(
-            hmac.new(key, message[:6], hashlib.sha1).hexdigest()
-        )[:14]
-
-        # Concatenate all the parts to create the output value as a bytearray
-        output_value = (
-            unlock_command.to_bytes(1, "big")
-            + admin_identification_mode.to_bytes(1, "big")
-            + timestamp.to_bytes(4, "big")
-            + hmac_result
-        )
-
+        """Encrypt the time sync command packet."""
+        output_value = self._encrypt_command(command=0x08, admin_identification_mode=0x40)
         _LOGGER.debug("Sent time sync msg %s", output_value)
+        return output_value
+
+    def _encrypt_battery(self):
+        """Encrypt the battery request command packet."""
+        output_value = self._encrypt_command(command=0x06, admin_identification_mode=0x40)
+        _LOGGER.debug("Sent battery msg %s", output_value)
         return output_value
 
     async def locker(self, kind) -> None:
@@ -223,6 +216,10 @@ class Yeelock:
         except BleakError as error:
             self._connected = False
             _LOGGER.error("BleakError: %s", error)
+        finally:
+            # Refresh battery after lock activity when the battery entity exists.
+            if self._battery_sensor is not None:
+                await self.update_battery()
 
     async def time_sync(self) -> None:
         """Time sync and retry."""
@@ -232,6 +229,18 @@ class Yeelock:
             _LOGGER.debug("Time sync start")
             await self._client.write_gatt_char(
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt_time())
+            )
+        except BleakError as error:
+            self._connected = False
+            _LOGGER.error("BleakError: %s", error)
+
+    async def update_battery(self) -> None:
+        """Request battery level from the lock over BLE."""
+        await self._connect()
+        try:
+            _LOGGER.debug("Requesting battery level")
+            await self._client.write_gatt_char(
+                uuid.UUID(UUID_COMMAND), bytearray(self._encrypt_battery())
             )
         except BleakError as error:
             self._connected = False

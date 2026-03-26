@@ -56,7 +56,6 @@ Copy all files in the `custom_components`/`yeelock` folder to your Home Assistan
 ## Future enhancements
 Your support is welcomed.
 
-- Add battery level sensor
 - Add option to unlock automatically if battery gets too low
 
 # Acknowledgements
