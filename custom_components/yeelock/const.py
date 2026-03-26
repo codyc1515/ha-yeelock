@@ -6,6 +6,7 @@ DOMAIN = "yeelock"
 
 PLATFORMS: list[str] = [
     Platform.LOCK,
+    Platform.SENSOR,
 ]
 
 CONF_PHONE = "phone"

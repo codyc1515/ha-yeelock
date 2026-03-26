@@ -52,6 +52,7 @@ class Yeelock:
         self._hass = hass
         self._device = None
         self._lock = None
+        self._battery_sensor = None
         self._client = None
         self._connecting = False
         self._connected = False
@@ -60,6 +61,7 @@ class Yeelock:
         self.key = config.get(CONF_API_KEY)
         self.model = config.get(CONF_MODEL, None)
         self.manufacturer = "Yeelock"
+        self.battery_level = None
 
     async def disconnect(self):
         """Disconnect from the device."""
@@ -138,6 +140,16 @@ class Yeelock:
                 await self.locker(self._last_action)
                 self._last_action = None
 
+        # Battery response notification
+        elif first_byte == hex(0x7):
+            if len(value) > 6:
+                self.battery_level = value[6]
+                _LOGGER.debug("Received battery level: %s%%", self.battery_level)
+                if self._battery_sensor is not None:
+                    await self._battery_sensor._update_battery_level(self.battery_level)
+            else:
+                _LOGGER.warning("Battery notification too short: %s", received_message)
+
         # Unknown notification received
         else:
             _LOGGER.warning("Unknown notification received (%s)", first_byte)
@@ -211,6 +223,32 @@ class Yeelock:
         _LOGGER.debug("Sent time sync msg %s", output_value)
         return output_value
 
+    def _encrypt_battery(self):
+        """Encrypt the battery request command."""
+        battery_command = 0x06
+        admin_identification_mode = 0x40
+        key = bytearray.fromhex(self.key)
+        timestamp = int(time())
+
+        message = (
+            battery_command.to_bytes(1, "big")
+            + admin_identification_mode.to_bytes(1, "big")
+            + timestamp.to_bytes(4, "big")
+        )
+        hmac_result = bytearray.fromhex(
+            hmac.new(key, message[:6], hashlib.sha1).hexdigest()
+        )[:14]
+
+        output_value = (
+            battery_command.to_bytes(1, "big")
+            + admin_identification_mode.to_bytes(1, "big")
+            + timestamp.to_bytes(4, "big")
+            + hmac_result
+        )
+
+        _LOGGER.debug("Sent battery msg %s", output_value)
+        return output_value
+
     async def locker(self, kind) -> None:
         """Lock, unlock and quick unlock the device."""
         self._last_action = kind  # Save action before attempting
@@ -232,6 +270,18 @@ class Yeelock:
             _LOGGER.debug("Time sync start")
             await self._client.write_gatt_char(
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt_time())
+            )
+        except BleakError as error:
+            self._connected = False
+            _LOGGER.error("BleakError: %s", error)
+
+    async def update_battery(self) -> None:
+        """Request battery level."""
+        await self._connect()
+        try:
+            _LOGGER.debug("Requesting battery level")
+            await self._client.write_gatt_char(
+                uuid.UUID(UUID_COMMAND), bytearray(self._encrypt_battery())
             )
         except BleakError as error:
             self._connected = False
