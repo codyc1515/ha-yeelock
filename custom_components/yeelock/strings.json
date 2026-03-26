@@ -6,16 +6,37 @@
 		},
 		"error": {
 			"cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+			"account_not_registered": "Account is not registered in Yeelock. Create the account first or switch sign-in method.",
 			"invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
 			"unknown": "[%key:common::config_flow::error::unknown%]"
 		},
 		"step": {
-			"cloud": {
+			"account_type": {
 				"title": "Yeelock",
-				"description": "Devices must be set-up in the Yeelock app first (requires an account).",
+				"description": "How do you sign in to the Yeelock app?",
 				"data": {
-					"country_code": "Country Code",
-					"phone": "Phone Number",
+					"account_type": "Sign-in method"
+				}
+			},
+			"cloud_email": {
+				"title": "Yeelock",
+				"description": "Sign in with your Yeelock email account.",
+				"data": {
+					"phone": "Account",
+					"password": "[%key:common::config_flow::data::password%]",
+					"auto_unlock_low_battery": "Automatically unlock on low battery",
+					"auto_unlock_low_battery_threshold": "Low battery unlock threshold (%)",
+					"name": "[%key:common::config_flow::data::name%]",
+					"mac": "MAC Address",
+					"api_key": "[%key:common::config_flow::data::password%]"
+				}
+			},
+			"cloud_phone": {
+				"title": "Yeelock",
+				"description": "Sign in with your Yeelock phone account (country code + space + phone number).",
+				"data": {
+					"country_code": "Country code",
+					"phone": "Phone number",
 					"password": "[%key:common::config_flow::data::password%]",
 					"auto_unlock_low_battery": "Automatically unlock on low battery",
 					"auto_unlock_low_battery_threshold": "Low battery unlock threshold (%)",

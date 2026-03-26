@@ -6,15 +6,36 @@
 		},
 		"error": {
 			"cannot_connect": "Falha na ligação",
+			"account_not_registered": "A conta não está registada no Yeelock. Crie a conta primeiro ou altere o método de início de sessão.",
 			"invalid_auth": "Autenticação invalida",
 			"unknown": "Erro desconhecido"
 		},
 		"step": {
-			"cloud": {
+			"account_type": {
 				"title": "Yeelock",
-				"description": "Os esquipamentos tem que ser configurados primeiro na Yeelock app (Obrigatório Conta).",
+				"description": "Como faz login na app Yeelock?",
 				"data": {
-					"country_code": "Código de País",
+					"account_type": "Método de login"
+				}
+			},
+			"cloud_email": {
+				"title": "Yeelock",
+				"description": "Inicie sessão com a sua conta de email Yeelock.",
+				"data": {
+					"phone": "Account",
+					"password": "Senha",
+					"auto_unlock_low_battery": "Destravar automaticamente com bateria baixa",
+					"auto_unlock_low_battery_threshold": "Limite de bateria para destravar (%)",
+					"name": "Nome",
+					"mac": "Endereço MAC",
+					"api_key": "Chave de API"
+				}
+			},
+			"cloud_phone": {
+				"title": "Yeelock",
+				"description": "Inicie sessão com a sua conta de telemóvel Yeelock (indicativo + espaço + número).",
+				"data": {
+					"country_code": "Indicativo do país",
 					"phone": "Número de telefone",
 					"password": "Senha",
 					"auto_unlock_low_battery": "Destravar automaticamente com bateria baixa",
