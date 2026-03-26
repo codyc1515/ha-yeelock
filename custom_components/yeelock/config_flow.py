@@ -62,14 +62,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    @staticmethod
-    @config_entries.callback
-    def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
-    ) -> YeelockOptionsFlow:
-        """Create the options flow."""
-        return YeelockOptionsFlow(config_entry)
-
     def __init__(self) -> None:
         """Initialize Yeelock config flow."""
         self._schema = STEP_USER_DATA_SCHEMA
@@ -527,44 +519,3 @@ class YeelockAuthError(YeelockApiError):
 class YeelockAccountNotRegisteredError(YeelockAuthError):
     """Raised when the Yeelock account has not been registered."""
 
-
-class YeelockOptionsFlow(config_entries.OptionsFlowWithReload):
-    """Handle options for Yeelock."""
-
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Manage Yeelock options."""
-        if user_input is not None:
-            return self.async_create_entry(title="", data=user_input)
-
-        return self.async_show_form(
-            step_id="init",
-            data_schema=voluptuous.Schema(
-                {
-                    voluptuous.Required(
-                        CONF_AUTO_UNLOCK_LOW_BATTERY,
-                        default=self.config_entry.options.get(
-                            CONF_AUTO_UNLOCK_LOW_BATTERY,
-                            self.config_entry.data.get(
-                                CONF_AUTO_UNLOCK_LOW_BATTERY,
-                                DEFAULT_AUTO_UNLOCK_LOW_BATTERY,
-                            ),
-                        ),
-                    ): bool,
-                    voluptuous.Required(
-                        CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
-                        default=self.config_entry.options.get(
-                            CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
-                            self.config_entry.data.get(
-                                CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
-                                DEFAULT_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
-                            ),
-                        ),
-                    ): voluptuous.All(
-                        cv.positive_int,
-                        voluptuous.Range(min=1, max=100),
-                    ),
-                }
-            ),
-        )
