@@ -40,11 +40,6 @@ class YeelockLock(YeelockDeviceEntity, LockEntity, RestoreEntity):
             self._attr_state = state.state
 
     @property
-    def code_format(self):
-        """Returns code format."""
-        return None
-
-    @property
     def is_locking(self):
         """Return true if lock is locking."""
         return self._attr_state == "locking"
