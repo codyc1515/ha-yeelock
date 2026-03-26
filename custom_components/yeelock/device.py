@@ -1,5 +1,6 @@
 """Yeelock device."""
 
+import asyncio
 import hashlib
 import hmac
 import logging
@@ -55,6 +56,7 @@ class Yeelock:
         self._battery_sensor = None
         self._client = None
         self._connecting = False
+        self._connect_lock = asyncio.Lock()
         self._connected = False
         self.mac = config.get(CONF_MAC)
         self.name = config.get(CONF_NAME)
@@ -74,9 +76,12 @@ class Yeelock:
 
         :raises BleakError: if the device is not found
         """
-        self._connecting = True
-        try:
-            if (self._client is None) or (not self._client.is_connected):
+        async with self._connect_lock:
+            if self._client is not None and self._client.is_connected:
+                return
+
+            self._connecting = True
+            try:
                 self._device = bluetooth.async_ble_device_from_address(
                     self._hass, self.mac, connectable=True
                 )
@@ -92,10 +97,8 @@ class Yeelock:
                     uuid.UUID(UUID_NOTIFY), self._handle_data
                 )
                 _LOGGER.debug("Listening for notifications", self.mac)
-        except Exception as error:
-            self._connecting = False
-            raise error
-        self._connecting = False
+            finally:
+                self._connecting = False
 
     async def _handle_data(self, sender, value):
         """Handle data notifications."""
