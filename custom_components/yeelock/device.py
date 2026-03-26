@@ -159,93 +159,48 @@ class Yeelock:
             _LOGGER.debug("Notified of %s", new_state)
             await self._lock._update_lock_state(new_state)
 
-    def _encrypt(self, unlock_mode):
-        """Encrypt the data."""
-        # Given values
-        unlock_command = 0x01
-        admin_identification_mode = 0x50
-        key = bytearray.fromhex(self.key)
+    def _encrypt_command(
+        self, command: int, admin_identification_mode: int, payload: bytes = b""
+    ) -> bytes:
+        """Encrypt a command packet.
 
-        # Convert epoch time to a human-readable date and time
+        The protocol frames are 20 bytes long and include:
+        command + admin mode + timestamp + optional payload + HMAC-SHA1 fragment.
+        """
+        key = bytearray.fromhex(self.key)
         timestamp = int(time())
 
-        # Generate the HMAC
         message = (
-            unlock_command.to_bytes(1, "big")
+            command.to_bytes(1, "big")
             + admin_identification_mode.to_bytes(1, "big")
             + timestamp.to_bytes(4, "big")
-            + int(unlock_mode, 16).to_bytes(1, "big")
+            + payload
         )
+        signature_length = 20 - len(message)
         hmac_result = bytearray.fromhex(
-            hmac.new(key, message[:7], hashlib.sha1).hexdigest()
-        )[:13]
+            hmac.new(key, message, hashlib.sha1).hexdigest()
+        )[:signature_length]
+        return message + hmac_result
 
-        # Concatenate all the parts to create the output value as a bytearray
-        output_value = (
-            unlock_command.to_bytes(1, "big")
-            + admin_identification_mode.to_bytes(1, "big")
-            + timestamp.to_bytes(4, "big")
-            + int(unlock_mode, 16).to_bytes(1, "big")
-            + hmac_result
+    def _encrypt(self, unlock_mode):
+        """Encrypt lock and unlock command packets."""
+        output_value = self._encrypt_command(
+            command=0x01,
+            admin_identification_mode=0x50,
+            payload=int(unlock_mode, 16).to_bytes(1, "big"),
         )
-
         _LOGGER.debug("Sent transactional msg %s", output_value)
         return output_value
 
     def _encrypt_time(self):
-        """Encrypt the time."""
-        # Given values
-        unlock_command = 0x08
-        admin_identification_mode = 0x40
-        key = bytearray.fromhex(self.key)
-
-        # Convert epoch time to a human-readable date and time
-        timestamp = int(time())
-
-        # Generate the HMAC
-        message = (
-            unlock_command.to_bytes(1, "big")
-            + admin_identification_mode.to_bytes(1, "big")
-            + timestamp.to_bytes(4, "big")
-        )
-        hmac_result = bytearray.fromhex(
-            hmac.new(key, message[:6], hashlib.sha1).hexdigest()
-        )[:14]
-
-        # Concatenate all the parts to create the output value as a bytearray
-        output_value = (
-            unlock_command.to_bytes(1, "big")
-            + admin_identification_mode.to_bytes(1, "big")
-            + timestamp.to_bytes(4, "big")
-            + hmac_result
-        )
-
+        """Encrypt the time sync command packet."""
+        output_value = self._encrypt_command(command=0x08, admin_identification_mode=0x40)
         _LOGGER.debug("Sent time sync msg %s", output_value)
         return output_value
 
     def _encrypt_battery(self):
-        """Encrypt the battery request command."""
-        battery_command = 0x06
-        admin_identification_mode = 0x40
-        key = bytearray.fromhex(self.key)
-        timestamp = int(time())
-
-        message = (
-            battery_command.to_bytes(1, "big")
-            + admin_identification_mode.to_bytes(1, "big")
-            + timestamp.to_bytes(4, "big")
-        )
-        hmac_result = bytearray.fromhex(
-            hmac.new(key, message[:6], hashlib.sha1).hexdigest()
-        )[:14]
-
-        output_value = (
-            battery_command.to_bytes(1, "big")
-            + admin_identification_mode.to_bytes(1, "big")
-            + timestamp.to_bytes(4, "big")
-            + hmac_result
-        )
-
+        """Encrypt the battery request command packet."""
+        output_value = self._encrypt_command(command=0x06, admin_identification_mode=0x40)
         _LOGGER.debug("Sent battery msg %s", output_value)
         return output_value
 
