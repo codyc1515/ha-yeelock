@@ -531,10 +531,6 @@ class YeelockAccountNotRegisteredError(YeelockAuthError):
 class YeelockOptionsFlow(config_entries.OptionsFlowWithReload):
     """Handle options for Yeelock."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        super().__init__(config_entry)
-
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
