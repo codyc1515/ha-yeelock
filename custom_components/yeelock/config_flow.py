@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import aiohttp
 import async_timeout
-import asyncio
 import socket
 import logging
 from typing import Any
@@ -13,6 +12,7 @@ import voluptuous
 
 from bluetooth_data_tools import human_readable_name
 from homeassistant import config_entries
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.const import (
     CONF_COUNTRY_CODE,
     CONF_PASSWORD,
@@ -48,7 +48,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     def __init__(self) -> None:
         """Initialize Yeelock config flow."""
-        self._session = None  # Avoids unclosed client session
         self._schema = STEP_USER_DATA_SCHEMA
         self._discovery_info: BluetoothServiceInfoBleak | None = None
         self._discovered_devices: dict[str, BluetoothServiceInfoBleak] = {}
@@ -99,60 +98,60 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             await self.async_set_unique_id(address, raise_on_progress=False)
             self._abort_if_unique_id_configured()
 
-            # Get OAuth token
-            _LOGGER.debug("Get token")
-            login = await self._api_wrapper(
-                method="post",
-                url="https://api.yeeloc.com/oauth/access_token",
-                params={
-                    "grant_type": "password",
-                    "client_id": "yeeloc",
-                    "client_secret": "adb03414981961952ccf40a1b4031d12",
-                    "username": user_input[CONF_PHONE],
-                    "password": user_input[CONF_PASSWORD],
-                    "zone": user_input[CONF_COUNTRY_CODE],
-                },
-                headers={
-                    "content-type": "application/x-www-form-urlencoded; charset=UTF-8"
-                },
-            )
-
             try:
-                if login["access_token"]:
-                    # Get locks
-                    _LOGGER.debug("Get locks")
-                    locks = await self._api_wrapper(
-                        method="get",
-                        url="https://api.yeeloc.com/lock",
-                        headers={"Authorization": "Bearer " + login["access_token"]},
+                login = await self._api_wrapper(
+                    method="post",
+                    url="https://api.yeeloc.com/oauth/access_token",
+                    params={
+                        "grant_type": "password",
+                        "client_id": "yeeloc",
+                        "client_secret": "adb03414981961952ccf40a1b4031d12",
+                        "username": user_input[CONF_PHONE],
+                        "password": user_input[CONF_PASSWORD],
+                        "zone": user_input[CONF_COUNTRY_CODE],
+                    },
+                    headers={
+                        "content-type": "application/x-www-form-urlencoded; charset=UTF-8"
+                    },
+                )
+                token = login.get("access_token")
+                if not token:
+                    errors["base"] = "auth_error"
+                    return self.async_show_form(
+                        step_id="cloud", data_schema=self._schema, errors=errors
                     )
 
-                    _LOGGER.debug(locks)
-                    for lock in locks:
-                        if (
-                            self._discovery_info.name.removeprefix("EL_")
-                            == lock["lock_sn"]
-                        ):
-                            _LOGGER.debug("Found lock and key")
+                # Get locks
+                _LOGGER.debug("Get locks")
+                locks = await self._api_wrapper(
+                    method="get",
+                    url="https://api.yeeloc.com/lock",
+                    headers={"Authorization": f"Bearer {token}"},
+                )
 
-                            user_input[CONF_API_KEY] = lock["ble_sign_key"]
-                            user_input[CONF_MAC] = address
-                            user_input[CONF_NAME] = lock["lock_name"]
-                            user_input[CONF_MODEL] = lock["lock_type"]
+                _LOGGER.debug(locks)
+                for lock in locks:
+                    if self._discovery_info.name.removeprefix("EL_") == lock["lock_sn"]:
+                        _LOGGER.debug("Found lock and key")
 
-                            await self._session.close()
+                        user_input[CONF_API_KEY] = lock["ble_sign_key"]
+                        user_input[CONF_MAC] = address
+                        user_input[CONF_NAME] = lock["lock_name"]
+                        user_input[CONF_MODEL] = lock["lock_type"]
 
-                            return self.async_create_entry(
-                                title=user_input[CONF_NAME], data=user_input
-                            )
-                    errors["base"] = "cannot_connect"
-                else:
-                    errors["base"] = "auth_error"
-            except KeyError:
+                        return self.async_create_entry(
+                            title=user_input[CONF_NAME], data=user_input
+                        )
+                errors["base"] = "cannot_connect"
+            except YeelockAuthError:
+                errors["base"] = "auth_error"
+            except YeelockApiError:
                 errors["base"] = "unknown"
 
             _LOGGER.warning("Failed cloud login")
-            return self.async_show_form(step_id="cloud", data_schema=self._schema)
+            return self.async_show_form(
+                step_id="cloud", data_schema=self._schema, errors=errors
+            )
         else:
             _LOGGER.debug("Showing cloud form")
             return self.async_show_form(
@@ -174,14 +173,13 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         json: dict | None = None,
         params: dict | None = None,
         headers: dict | None = None,
-    ) -> any:
+    ) -> Any:
         """Get information from the API."""
-        if self._session is None:
-            self._session = aiohttp.ClientSession()
+        session = async_get_clientsession(self.hass)
 
         try:
             async with async_timeout.timeout(10):
-                response = await self._session.request(
+                response = await session.request(
                     method=method,
                     url=url,
                     data=data,
@@ -190,19 +188,19 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     headers=headers,
                 )
                 if response.status in (400, 401, 403):
-                    raise Exception(
-                        "Invalid credentials",
-                    )
+                    raise YeelockAuthError
                 response.raise_for_status()
                 return await response.json()
 
-        except asyncio.TimeoutError as exception:
-            raise Exception(
-                "Timeout error fetching information: %s", exception
-            ) from exception
+        except TimeoutError as exception:
+            raise YeelockApiError("Timeout error fetching information") from exception
         except (aiohttp.ClientError, socket.gaierror) as exception:
-            raise Exception("Error fetching information: %s", exception) from exception
-        except Exception as exception:  # pylint: disable=broad-except
-            raise Exception(
-                "Something really wrong happened! %s", exception
-            ) from exception
+            raise YeelockApiError("Error fetching information") from exception
+
+
+class YeelockApiError(Exception):
+    """Base API exception raised by the Yeelock integration."""
+
+
+class YeelockAuthError(YeelockApiError):
+    """Raised when authentication with the Yeelock cloud fails."""
