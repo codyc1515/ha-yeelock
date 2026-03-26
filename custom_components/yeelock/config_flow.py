@@ -112,10 +112,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def _async_try_auto_configure_from_saved_account(self) -> FlowResult | None:
         """Try to configure from previously saved credentials."""
         if not self._discovery_info or not self._discovery_info.address:
+            _LOGGER.debug("Auto-config skipped: discovery info missing")
             return None
 
         saved = self._get_saved_account_data()
         if not saved:
+            _LOGGER.debug("Auto-config skipped: no previously saved credentials found")
             return None
 
         account = saved[CONF_PHONE]
@@ -147,6 +149,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
                 _LOGGER.debug("Auto-configured discovered lock using saved account")
                 return self.async_create_entry(title=auto_input[CONF_NAME], data=auto_input)
+            _LOGGER.debug(
+                "Auto-config skipped: discovered device name %s did not match any cloud lock",
+                self._discovery_info.name,
+            )
         except YeelockApiError:
             _LOGGER.debug("Saved account auto-configuration attempt failed")
 
@@ -188,8 +194,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         locks = locks_response.get("data", [])
         _LOGGER.debug(locks_response)
+        discovered_name = self._discovery_info.name
+        if not discovered_name:
+            _LOGGER.debug("Unable to match lock: discovered bluetooth device name is missing")
+            return None
         for lock in locks:
-            if self._discovery_info.name.removeprefix("EL_") == lock["sn"]:
+            if discovered_name.removeprefix("EL_") == lock["sn"]:
                 return lock
         return None
 
