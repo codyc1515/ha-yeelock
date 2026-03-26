@@ -89,8 +89,109 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
         }
 
+        # If this account was already configured for another lock, try to
+        # automatically provision this newly discovered lock.
+        if auto_entry := await self._async_try_auto_configure_from_saved_account():
+            return auto_entry
+
         _LOGGER.debug("Handoff to account type step")
         return await self.async_step_account_type()
+
+    def _get_saved_account_data(self) -> dict[str, Any] | None:
+        """Get a previously configured Yeelock account payload."""
+        for entry in self.hass.config_entries.async_entries(DOMAIN):
+            if (
+                CONF_PHONE in entry.data
+                and CONF_PASSWORD in entry.data
+                and entry.data[CONF_PHONE]
+                and entry.data[CONF_PASSWORD]
+            ):
+                return dict(entry.data)
+        return None
+
+    async def _async_try_auto_configure_from_saved_account(self) -> FlowResult | None:
+        """Try to configure from previously saved credentials."""
+        if not self._discovery_info or not self._discovery_info.address:
+            return None
+
+        saved = self._get_saved_account_data()
+        if not saved:
+            return None
+
+        account = saved[CONF_PHONE]
+        if CONF_COUNTRY_CODE in saved and saved[CONF_COUNTRY_CODE]:
+            account = f"{saved[CONF_COUNTRY_CODE]} {saved[CONF_PHONE]}"
+
+        try:
+            token = await self._async_login_and_get_token(account, saved[CONF_PASSWORD])
+            lock = await self._async_get_matching_lock(token)
+            if lock:
+                auto_input: dict[str, Any] = {
+                    CONF_PHONE: saved[CONF_PHONE],
+                    CONF_PASSWORD: saved[CONF_PASSWORD],
+                    CONF_API_KEY: lock["ble_sign_key"],
+                    CONF_MAC: self._discovery_info.address,
+                    CONF_NAME: lock["name"],
+                    CONF_MODEL: lock["type"],
+                    CONF_AUTO_UNLOCK_LOW_BATTERY: saved.get(
+                        CONF_AUTO_UNLOCK_LOW_BATTERY,
+                        DEFAULT_AUTO_UNLOCK_LOW_BATTERY,
+                    ),
+                    CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD: saved.get(
+                        CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+                        DEFAULT_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+                    ),
+                }
+                if CONF_COUNTRY_CODE in saved:
+                    auto_input[CONF_COUNTRY_CODE] = saved[CONF_COUNTRY_CODE]
+
+                _LOGGER.debug("Auto-configured discovered lock using saved account")
+                return self.async_create_entry(title=auto_input[CONF_NAME], data=auto_input)
+        except YeelockApiError:
+            _LOGGER.debug("Saved account auto-configuration attempt failed")
+
+        return None
+
+    async def _async_login_and_get_token(self, account: str, password: str) -> str:
+        """Authenticate against cloud and return token."""
+        login = await self._api_wrapper(
+            method="post",
+            url="https://api.yeeloc.com/v2/auth/by/password",
+            data={
+                "account": account,
+                "password": password,
+            },
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+                "Accept": "*/*",
+            },
+        )
+        token = login.get("data", {}).get("access_token")
+        if not token:
+            raise YeelockAuthError
+        return token
+
+    async def _async_get_matching_lock(self, token: str) -> dict[str, Any] | None:
+        """Find the discovered lock in the cloud lock list."""
+        if not self._discovery_info:
+            return None
+
+        locks_response = await self._api_wrapper(
+            method="get",
+            url="https://api.yeeloc.com/v2/user/device/list",
+            params={"group_id": -1},
+            headers={
+                "Accept": "*/*",
+                "Authorization": token,
+            },
+        )
+
+        locks = locks_response.get("data", [])
+        _LOGGER.debug(locks_response)
+        for lock in locks:
+            if self._discovery_info.name.removeprefix("EL_") == lock["sn"]:
+                return lock
+        return None
 
     async def async_step_account_type(
         self, user_input: dict[str, Any] | None = None
@@ -185,53 +286,20 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 account = f"{user_input[CONF_COUNTRY_CODE]} {user_input[CONF_PHONE]}"
 
             try:
-                login = await self._api_wrapper(
-                    method="post",
-                    url="https://api.yeeloc.com/v2/auth/by/password",
-                    data={
-                        "account": account,
-                        "password": user_input[CONF_PASSWORD],
-                    },
-                    headers={
-                        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-                        "Accept": "*/*",
-                    },
+                token = await self._async_login_and_get_token(
+                    account, user_input[CONF_PASSWORD]
                 )
-                token = login.get("data", {}).get("access_token")
-                if not token:
-                    errors["base"] = "invalid_auth"
-                    return self.async_show_form(
-                        step_id="cloud_phone" if is_phone else "cloud_email",
-                        data_schema=self._schema,
-                        errors=errors,
+                lock = await self._async_get_matching_lock(token)
+                if lock:
+                    _LOGGER.debug("Found lock and key")
+                    user_input[CONF_API_KEY] = lock["ble_sign_key"]
+                    user_input[CONF_MAC] = address
+                    user_input[CONF_NAME] = lock["name"]
+                    user_input[CONF_MODEL] = lock["type"]
+
+                    return self.async_create_entry(
+                        title=user_input[CONF_NAME], data=user_input
                     )
-
-                # Get locks
-                _LOGGER.debug("Get locks")
-                locks_response = await self._api_wrapper(
-                    method="get",
-                    url="https://api.yeeloc.com/v2/user/device/list",
-                    params={"group_id": -1},
-                    headers={
-                        "Accept": "*/*",
-                        "Authorization": token,
-                    },
-                )
-
-                locks = locks_response.get("data", [])
-                _LOGGER.debug(locks_response)
-                for lock in locks:
-                    if self._discovery_info.name.removeprefix("EL_") == lock["sn"]:
-                        _LOGGER.debug("Found lock and key")
-
-                        user_input[CONF_API_KEY] = lock["ble_sign_key"]
-                        user_input[CONF_MAC] = address
-                        user_input[CONF_NAME] = lock["name"]
-                        user_input[CONF_MODEL] = lock["type"]
-
-                        return self.async_create_entry(
-                            title=user_input[CONF_NAME], data=user_input
-                        )
                 errors["base"] = "cannot_connect"
             except YeelockAccountNotRegisteredError:
                 errors["base"] = "account_not_registered"
