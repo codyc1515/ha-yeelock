@@ -16,7 +16,16 @@ from homeassistant.const import CONF_API_KEY, CONF_MAC, CONF_MODEL, CONF_NAME
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import device_registry as dr
 
-from .const import DOMAIN, LOCKER_KIND, UUID_COMMAND, UUID_NOTIFY
+from .const import (
+    CONF_AUTO_UNLOCK_LOW_BATTERY,
+    CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+    DEFAULT_AUTO_UNLOCK_LOW_BATTERY,
+    DEFAULT_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+    DOMAIN,
+    LOCKER_KIND,
+    UUID_COMMAND,
+    UUID_NOTIFY,
+)
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -66,6 +75,15 @@ class Yeelock:
         self.manufacturer = "Yeelock"
         self.battery_level = None
         self._last_action = None
+        self.auto_unlock_low_battery = config.get(
+            CONF_AUTO_UNLOCK_LOW_BATTERY,
+            DEFAULT_AUTO_UNLOCK_LOW_BATTERY,
+        )
+        self.auto_unlock_low_battery_threshold = config.get(
+            CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+            DEFAULT_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+        )
+        self._auto_unlock_triggered = False
 
     async def disconnect(self):
         """Disconnect from the device."""
@@ -154,6 +172,8 @@ class Yeelock:
                 _LOGGER.debug("Received battery level: %s%%", self.battery_level)
                 if self._battery_sensor is not None:
                     await self._battery_sensor._update_battery_level(self.battery_level)
+
+                await self._maybe_auto_unlock_low_battery()
             else:
                 _LOGGER.warning("Battery notification too short: %s", hexlify(value, " "))
 
@@ -256,3 +276,31 @@ class Yeelock:
         except Exception as error:  # pragma: no cover - backend-specific transient failures
             self._connected = False
             _LOGGER.warning("Unable to update battery for %s: %s", self.mac, error)
+
+    async def _maybe_auto_unlock_low_battery(self) -> None:
+        """Unlock the lock automatically when battery is critically low."""
+        if self.battery_level is None:
+            return
+
+        if not self.auto_unlock_low_battery:
+            self._auto_unlock_triggered = False
+            return
+
+        if self.battery_level > self.auto_unlock_low_battery_threshold:
+            self._auto_unlock_triggered = False
+            return
+
+        if self._auto_unlock_triggered:
+            return
+
+        if self._lock is not None and not self._lock.is_locked:
+            self._auto_unlock_triggered = True
+            return
+
+        _LOGGER.warning(
+            "Battery level (%s%%) is at or below %s%%, attempting automatic unlock",
+            self.battery_level,
+            self.auto_unlock_low_battery_threshold,
+        )
+        self._auto_unlock_triggered = True
+        await self.locker("unlock")
