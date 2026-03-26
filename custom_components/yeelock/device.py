@@ -1,5 +1,6 @@
 """Yeelock device."""
 
+import asyncio
 import hashlib
 import hmac
 import logging
@@ -9,6 +10,7 @@ from time import time
 
 from bleak import BleakClient
 from bleak.exc import BleakError
+from bleak_retry_connector import establish_connection
 from homeassistant.components import bluetooth
 from homeassistant.const import CONF_API_KEY, CONF_MAC, CONF_MODEL, CONF_NAME
 from homeassistant.core import HomeAssistant
@@ -55,6 +57,7 @@ class Yeelock:
         self._battery_sensor = None
         self._client = None
         self._connecting = False
+        self._connect_lock = asyncio.Lock()
         self._connected = False
         self.mac = config.get(CONF_MAC)
         self.name = config.get(CONF_NAME)
@@ -62,6 +65,7 @@ class Yeelock:
         self.model = config.get(CONF_MODEL, None)
         self.manufacturer = "Yeelock"
         self.battery_level = None
+        self._last_action = None
 
     async def disconnect(self):
         """Disconnect from the device."""
@@ -74,9 +78,12 @@ class Yeelock:
 
         :raises BleakError: if the device is not found
         """
-        self._connecting = True
-        try:
-            if (self._client is None) or (not self._client.is_connected):
+        async with self._connect_lock:
+            if self._client is not None and self._client.is_connected:
+                return
+
+            self._connecting = True
+            try:
                 self._device = bluetooth.async_ble_device_from_address(
                     self._hass, self.mac, connectable=True
                 )
@@ -84,18 +91,20 @@ class Yeelock:
                     raise BleakError(
                         f"A device with address {self.mac} could not be found."
                     )
-                self._client = BleakClient(self._device)
                 _LOGGER.debug("Connecting to %s", self.mac)
-                await self._client.connect()
-                _LOGGER.debug("Connected", self.mac)
+                self._client = await establish_connection(
+                    BleakClient,
+                    self._device,
+                    self.mac,
+                    max_attempts=3,
+                )
+                _LOGGER.debug("Connected to %s", self.mac)
                 await self._client.start_notify(
                     uuid.UUID(UUID_NOTIFY), self._handle_data
                 )
                 _LOGGER.debug("Listening for notifications", self.mac)
-        except Exception as error:
-            self._connecting = False
-            raise error
-        self._connecting = False
+            finally:
+                self._connecting = False
 
     async def _handle_data(self, sender, value):
         """Handle data notifications."""
@@ -133,10 +142,10 @@ class Yeelock:
 
         # Time needs to be synced
         elif first_byte == hex(0x9):
-            _LOGGER.warning("Time needs to be synced")
+            _LOGGER.info("Lock reported time drift; syncing time")
             await self.time_sync()
             if self._last_action:
-                _LOGGER.warning("Retrying last action: %s", self._last_action)
+                _LOGGER.debug("Retrying last action after time sync: %s", self._last_action)
                 await self.locker(self._last_action)
                 self._last_action = None
 
@@ -236,8 +245,8 @@ class Yeelock:
 
     async def update_battery(self) -> None:
         """Request battery level from the lock over BLE."""
-        await self._connect()
         try:
+            await self._connect()
             _LOGGER.debug("Requesting battery level")
             await self._client.write_gatt_char(
                 uuid.UUID(UUID_COMMAND), bytearray(self._encrypt_battery())
@@ -245,3 +254,6 @@ class Yeelock:
         except BleakError as error:
             self._connected = False
             _LOGGER.error("BleakError: %s", error)
+        except Exception as error:  # pragma: no cover - backend-specific transient failures
+            self._connected = False
+            _LOGGER.warning("Unable to update battery for %s: %s", self.mac, error)
