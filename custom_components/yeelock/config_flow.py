@@ -94,11 +94,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
         }
 
-        # If this account was already configured for another lock, try to
-        # automatically provision this newly discovered lock.
-        if auto_entry := await self._async_try_auto_configure_from_saved_account():
-            return auto_entry
-
         _LOGGER.debug("Handoff to account type step")
         return await self.async_step_account_type()
 
@@ -106,13 +101,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def _build_account_id(account: str) -> str:
         """Build a stable account id."""
         return account.strip().lower()
-
-    @staticmethod
-    def _build_login_account(saved_account: dict[str, Any]) -> str:
-        """Build the cloud login account string for API auth."""
-        if saved_account.get(CONF_COUNTRY_CODE):
-            return f"{saved_account[CONF_COUNTRY_CODE]} {saved_account[CONF_PHONE]}"
-        return saved_account[CONF_PHONE]
 
     @staticmethod
     def _sanitize_account_for_store(saved_account: dict[str, Any]) -> dict[str, Any]:
@@ -125,43 +113,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if saved_account.get(CONF_COUNTRY_CODE):
             sanitized[CONF_COUNTRY_CODE] = saved_account[CONF_COUNTRY_CODE]
         return sanitized
-
-    async def _async_get_saved_accounts_data(self) -> list[dict[str, Any]]:
-        """Get all previously saved Yeelock account payloads."""
-        store = Store[dict[str, Any]](self.hass, ACCOUNT_STORE_VERSION, ACCOUNT_STORE_KEY)
-        stored_data = await store.async_load() or {}
-        stored_accounts = stored_data.get("accounts", [])
-        if stored_accounts:
-            return [
-                account
-                for account in stored_accounts
-                if account.get(CONF_PHONE) and account.get(CONF_PASSWORD)
-            ]
-
-        # Legacy fallback: first configured lock entry used to hold cloud credentials.
-        migrated_accounts: list[dict[str, Any]] = []
-        for entry in self.hass.config_entries.async_entries(DOMAIN):
-            if (
-                CONF_PHONE in entry.data
-                and CONF_PASSWORD in entry.data
-                and entry.data[CONF_PHONE]
-                and entry.data[CONF_PASSWORD]
-            ):
-                account: dict[str, Any] = {
-                    CONF_PHONE: entry.data[CONF_PHONE],
-                    CONF_PASSWORD: entry.data[CONF_PASSWORD],
-                }
-                if entry.data.get(CONF_COUNTRY_CODE):
-                    account[CONF_COUNTRY_CODE] = entry.data[CONF_COUNTRY_CODE]
-                account_id = self._build_account_id(self._build_login_account(account))
-                account[CONF_ACCOUNT_ID] = account_id
-                migrated_accounts.append(self._sanitize_account_for_store(account))
-
-        if migrated_accounts:
-            await store.async_save({"accounts": migrated_accounts})
-            _LOGGER.debug("Migrated %s Yeelock cloud account(s) to account store", len(migrated_accounts))
-
-        return migrated_accounts
 
     async def _async_save_account_data(self, account_data: dict[str, Any]) -> None:
         """Save or update account credentials in persistent account store."""
@@ -191,44 +142,6 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if normalized.startswith("EL_"):
             normalized = normalized.removeprefix("EL_")
         return normalized.replace(":", "").replace("-", "").replace("_", "")
-
-    async def _async_try_auto_configure_from_saved_account(self) -> FlowResult | None:
-        """Try to configure from previously saved credentials."""
-        if not self._discovery_info or not self._discovery_info.address:
-            _LOGGER.debug("Auto-config skipped: discovery info missing")
-            return None
-
-        saved_accounts = await self._async_get_saved_accounts_data()
-        if not saved_accounts:
-            _LOGGER.debug("Auto-config skipped: no previously saved credentials found")
-            return None
-
-        for saved in saved_accounts:
-            account = self._build_login_account(saved)
-            try:
-                token = await self._async_login_and_get_token(account, saved[CONF_PASSWORD])
-                lock = await self._async_get_matching_lock(token)
-                if lock:
-                    auto_input: dict[str, Any] = {
-                        CONF_ACCOUNT_ID: saved[CONF_ACCOUNT_ID],
-                        CONF_API_KEY: lock["ble_sign_key"],
-                        CONF_MAC: self._discovery_info.address,
-                        CONF_NAME: lock["name"],
-                        CONF_MODEL: lock["type"],
-                        CONF_AUTO_UNLOCK_LOW_BATTERY: DEFAULT_AUTO_UNLOCK_LOW_BATTERY,
-                        CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD: DEFAULT_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
-                    }
-                    _LOGGER.debug("Auto-configured discovered lock using saved account")
-                    return self.async_create_entry(title=auto_input[CONF_NAME], data=auto_input)
-            except YeelockApiError:
-                _LOGGER.debug("Saved account auto-configuration attempt failed")
-
-        _LOGGER.debug(
-            "Auto-config skipped: discovered device name %s did not match any cloud lock",
-            self._discovery_info.name,
-        )
-
-        return None
 
     async def _async_login_and_get_token(self, account: str, password: str) -> str:
         """Authenticate against cloud and return token."""
