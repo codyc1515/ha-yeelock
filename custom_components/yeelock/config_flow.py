@@ -116,7 +116,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 )
                 token = login.get("access_token")
                 if not token:
-                    errors["base"] = "auth_error"
+                    errors["base"] = "invalid_auth"
                     return self.async_show_form(
                         step_id="cloud", data_schema=self._schema, errors=errors
                     )
@@ -144,7 +144,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         )
                 errors["base"] = "cannot_connect"
             except YeelockAuthError:
-                errors["base"] = "auth_error"
+                errors["base"] = "invalid_auth"
             except YeelockApiError:
                 errors["base"] = "unknown"
 
