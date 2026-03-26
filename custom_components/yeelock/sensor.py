@@ -44,7 +44,7 @@ class YeelockBatterySensor(YeelockDeviceEntity, SensorEntity):
         await super().async_added_to_hass()
         if self.device.battery_level is not None:
             self._attr_native_value = self.device.battery_level
-        await self.device.update_battery()
+        self.hass.async_create_task(self.device.update_battery())
 
     async def _update_battery_level(self, new_level: int) -> None:
         """Handle push updates from BLE notifications."""
