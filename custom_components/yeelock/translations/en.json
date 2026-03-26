@@ -11,6 +11,10 @@
 			"unknown": "Unexpected error"
 		},
 		"step": {
+			"bluetooth_confirm": {
+				"title": "Yeelock",
+				"description": "Configure the discovered lock."
+			},
 			"account_type": {
 				"title": "Yeelock",
 				"description": "How do you sign in to the Yeelock app?",

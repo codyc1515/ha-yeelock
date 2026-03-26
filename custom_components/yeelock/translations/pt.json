@@ -11,6 +11,10 @@
 			"unknown": "Erro desconhecido"
 		},
 		"step": {
+			"bluetooth_confirm": {
+				"title": "Yeelock",
+				"description": "Configurar a fechadura descoberta."
+			},
 			"account_type": {
 				"title": "Yeelock",
 				"description": "Como faz login na app Yeelock?",

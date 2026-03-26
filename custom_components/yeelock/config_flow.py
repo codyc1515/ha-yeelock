@@ -94,13 +94,23 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             )
         }
 
-        # If this account was already configured for another lock, try to
-        # automatically provision this newly discovered lock.
-        if auto_entry := await self._async_try_auto_configure_from_saved_account():
-            return auto_entry
+        return await self.async_step_bluetooth_confirm()
 
-        _LOGGER.debug("Handoff to account type step")
-        return await self.async_step_account_type()
+    async def async_step_bluetooth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Confirm configuring a bluetooth-discovered lock."""
+        if user_input is not None:
+            if auto_entry := await self._async_try_auto_configure_from_saved_account():
+                return auto_entry
+
+            _LOGGER.debug("Handoff to account type step")
+            return await self.async_step_account_type()
+
+        return self.async_show_form(
+            step_id="bluetooth_confirm",
+            data_schema=voluptuous.Schema({}),
+        )
 
     @staticmethod
     def _build_account_id(account: str) -> str:
@@ -159,7 +169,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if migrated_accounts:
             await store.async_save({"accounts": migrated_accounts})
-            _LOGGER.debug("Migrated %s Yeelock cloud account(s) to account store", len(migrated_accounts))
+            _LOGGER.debug(
+                "Migrated %s Yeelock cloud account(s) to account store",
+                len(migrated_accounts),
+            )
 
         return migrated_accounts
 
@@ -218,8 +231,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_AUTO_UNLOCK_LOW_BATTERY: DEFAULT_AUTO_UNLOCK_LOW_BATTERY,
                         CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD: DEFAULT_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
                     }
-                    _LOGGER.debug("Auto-configured discovered lock using saved account")
-                    return self.async_create_entry(title=auto_input[CONF_NAME], data=auto_input)
+                    _LOGGER.debug(
+                        "Auto-configured discovered lock using saved account"
+                    )
+                    return self.async_create_entry(
+                        title=auto_input[CONF_NAME], data=auto_input
+                    )
             except YeelockApiError:
                 _LOGGER.debug("Saved account auto-configuration attempt failed")
 
