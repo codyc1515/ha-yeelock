@@ -45,7 +45,7 @@ class YeelockBatterySensor(YeelockDeviceEntity, SensorEntity):
         if self.device.battery_level is not None:
             self._attr_native_value = self.device.battery_level
         try:
-            await self.device.update_battery()
+            self.hass.async_create_task(self.device.update_battery())
         except Exception as error:  # pragma: no cover - defensive, device handles this too
             _LOGGER.warning(
                 "Unable to fetch initial battery level for %s: %s",
