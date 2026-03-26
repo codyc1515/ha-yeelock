@@ -48,7 +48,7 @@ class YeelockDeviceEntity:
         """Shared device info information."""
         return {
             "identifiers": {(DOMAIN, self.device.mac)},
-            "connections": {(dr.CONNECTION_NETWORK_MAC, self.device.mac)},
+            "connections": {(dr.CONNECTION_BLUETOOTH, self.device.mac)},
             "name": self.device.name,
             "manufacturer": self.device.manufacturer,
             "model": self.device.model,
