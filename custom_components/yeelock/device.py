@@ -62,6 +62,7 @@ class Yeelock:
         self.model = config.get(CONF_MODEL, None)
         self.manufacturer = "Yeelock"
         self.battery_level = None
+        self._last_action = None
 
     async def disconnect(self):
         """Disconnect from the device."""
