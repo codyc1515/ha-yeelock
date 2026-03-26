@@ -216,6 +216,10 @@ class Yeelock:
         except BleakError as error:
             self._connected = False
             _LOGGER.error("BleakError: %s", error)
+        finally:
+            # Refresh battery after lock activity when the battery entity exists.
+            if self._battery_sensor is not None:
+                await self.update_battery()
 
     async def time_sync(self) -> None:
         """Time sync and retry."""
@@ -231,7 +235,7 @@ class Yeelock:
             _LOGGER.error("BleakError: %s", error)
 
     async def update_battery(self) -> None:
-        """Request battery level."""
+        """Request battery level from the lock over BLE."""
         await self._connect()
         try:
             _LOGGER.debug("Requesting battery level")
