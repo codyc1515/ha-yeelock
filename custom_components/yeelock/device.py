@@ -139,10 +139,10 @@ class Yeelock:
 
         # Time needs to be synced
         elif first_byte == hex(0x9):
-            _LOGGER.warning("Time needs to be synced")
+            _LOGGER.info("Lock reported time drift; syncing time")
             await self.time_sync()
             if self._last_action:
-                _LOGGER.warning("Retrying last action: %s", self._last_action)
+                _LOGGER.debug("Retrying last action after time sync: %s", self._last_action)
                 await self.locker(self._last_action)
                 self._last_action = None
 
