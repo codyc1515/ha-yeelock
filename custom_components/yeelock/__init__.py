@@ -7,7 +7,14 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN, PLATFORMS
+from .const import (
+    CONF_AUTO_UNLOCK_LOW_BATTERY,
+    CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+    DEFAULT_AUTO_UNLOCK_LOW_BATTERY,
+    DEFAULT_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+    DOMAIN,
+    PLATFORMS,
+)
 from .device import Yeelock
 
 
@@ -18,7 +25,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Yeelock from a config entry."""
     if DOMAIN not in hass.data:
         hass.data[DOMAIN] = {}
-    yeelock_device = Yeelock(entry.data, hass)
+    config = {
+        **entry.data,
+        **entry.options,
+    }
+    config.setdefault(CONF_AUTO_UNLOCK_LOW_BATTERY, DEFAULT_AUTO_UNLOCK_LOW_BATTERY)
+    config.setdefault(
+        CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+        DEFAULT_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+    )
+
+    yeelock_device = Yeelock(config, hass)
     hass.data[DOMAIN][entry.unique_id] = yeelock_device
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True

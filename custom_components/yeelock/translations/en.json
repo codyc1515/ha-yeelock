@@ -17,9 +17,22 @@
 					"country_code": "Country Code",
 					"phone": "Phone Number",
 					"password": "Password",
+					"auto_unlock_low_battery": "Automatically unlock on low battery",
+					"auto_unlock_low_battery_threshold": "Low battery unlock threshold (%)",
 					"name": "Name",
 					"mac": "MAC Address",
 					"api_key": "API Key"
+				}
+			}
+		}
+	},
+	"options": {
+		"step": {
+			"init": {
+				"title": "Yeelock options",
+				"data": {
+					"auto_unlock_low_battery": "Automatically unlock on low battery",
+					"auto_unlock_low_battery_threshold": "Low battery unlock threshold (%)"
 				}
 			}
 		}

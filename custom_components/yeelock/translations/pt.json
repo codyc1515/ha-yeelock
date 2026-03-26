@@ -17,9 +17,22 @@
 					"country_code": "Código de País",
 					"phone": "Número de telefone",
 					"password": "Senha",
+					"auto_unlock_low_battery": "Destravar automaticamente com bateria baixa",
+					"auto_unlock_low_battery_threshold": "Limite de bateria para destravar (%)",
 					"name": "Nome",
 					"mac": "Endereço MAC",
 					"api_key": "Chave de API"
+				}
+			}
+		}
+	},
+	"options": {
+		"step": {
+			"init": {
+				"title": "Opções Yeelock",
+				"data": {
+					"auto_unlock_low_battery": "Destravar automaticamente com bateria baixa",
+					"auto_unlock_low_battery_threshold": "Limite de bateria para destravar (%)"
 				}
 			}
 		}

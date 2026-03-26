@@ -12,6 +12,7 @@ import voluptuous
 
 from bluetooth_data_tools import human_readable_name
 from homeassistant import config_entries
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.const import (
     CONF_COUNTRY_CODE,
@@ -24,7 +25,14 @@ from homeassistant.const import (
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 from homeassistant.data_entry_flow import FlowResult
 
-from .const import CONF_PHONE, DOMAIN
+from .const import (
+    CONF_AUTO_UNLOCK_LOW_BATTERY,
+    CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+    CONF_PHONE,
+    DEFAULT_AUTO_UNLOCK_LOW_BATTERY,
+    DEFAULT_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+    DOMAIN,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -45,6 +53,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Yeelock."""
 
     VERSION = 1
+
+    @staticmethod
+    @config_entries.callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> YeelockOptionsFlow:
+        """Create the options flow."""
+        return YeelockOptionsFlow(config_entry)
 
     def __init__(self) -> None:
         """Initialize Yeelock config flow."""
@@ -74,6 +90,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 voluptuous.Required(CONF_COUNTRY_CODE): str,
                 voluptuous.Required(CONF_PHONE): str,
                 voluptuous.Required(CONF_PASSWORD): str,
+                voluptuous.Required(
+                    CONF_AUTO_UNLOCK_LOW_BATTERY,
+                    default=DEFAULT_AUTO_UNLOCK_LOW_BATTERY,
+                ): bool,
+                voluptuous.Required(
+                    CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+                    default=DEFAULT_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+                ): voluptuous.All(cv.positive_int, voluptuous.Range(min=1, max=100)),
             }
         )
 
@@ -204,3 +228,45 @@ class YeelockApiError(Exception):
 
 class YeelockAuthError(YeelockApiError):
     """Raised when authentication with the Yeelock cloud fails."""
+
+
+class YeelockOptionsFlow(config_entries.OptionsFlowWithReload):
+    """Handle options for Yeelock."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage Yeelock options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=voluptuous.Schema(
+                {
+                    voluptuous.Required(
+                        CONF_AUTO_UNLOCK_LOW_BATTERY,
+                        default=self.config_entry.options.get(
+                            CONF_AUTO_UNLOCK_LOW_BATTERY,
+                            self.config_entry.data.get(
+                                CONF_AUTO_UNLOCK_LOW_BATTERY,
+                                DEFAULT_AUTO_UNLOCK_LOW_BATTERY,
+                            ),
+                        ),
+                    ): bool,
+                    voluptuous.Required(
+                        CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+                        default=self.config_entry.options.get(
+                            CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+                            self.config_entry.data.get(
+                                CONF_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+                                DEFAULT_AUTO_UNLOCK_LOW_BATTERY_THRESHOLD,
+                            ),
+                        ),
+                    ): voluptuous.All(
+                        cv.positive_int,
+                        voluptuous.Range(min=1, max=100),
+                    ),
+                }
+            ),
+        )
