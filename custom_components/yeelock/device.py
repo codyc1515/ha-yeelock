@@ -5,7 +5,6 @@ import hashlib
 import hmac
 import logging
 import uuid
-from binascii import hexlify
 from time import time
 
 from bleak import BleakClient
@@ -120,13 +119,13 @@ class Yeelock:
                 await self._client.start_notify(
                     uuid.UUID(UUID_NOTIFY), self._handle_data
                 )
-                _LOGGER.debug("Listening for notifications", self.mac)
+                _LOGGER.debug("Listening for notifications from %s", self.mac)
             finally:
                 self._connecting = False
 
     async def _handle_data(self, sender, value):
         """Handle data notifications."""
-        _LOGGER.debug("Received %s from %s", hexlify(value, " "), sender)  # noqa: E501
+        _LOGGER.debug("Received notification from %s (len=%s)", sender, len(value))
         if not value:
             _LOGGER.warning("Received empty notification from %s", sender)
             return
@@ -175,7 +174,11 @@ class Yeelock:
 
                 await self._maybe_auto_unlock_low_battery()
             else:
-                _LOGGER.warning("Battery notification too short: %s", hexlify(value, " "))
+                _LOGGER.warning(
+                    "Battery notification too short (len=%s) from %s",
+                    len(value),
+                    sender,
+                )
 
         # Unknown notification received
         else:
@@ -217,19 +220,19 @@ class Yeelock:
             admin_identification_mode=0x50,
             payload=int(unlock_mode, 16).to_bytes(1, "big"),
         )
-        _LOGGER.debug("Sent transactional msg %s", output_value)
+        _LOGGER.debug("Prepared transactional command payload")
         return output_value
 
     def _encrypt_time(self):
         """Encrypt the time sync command packet."""
         output_value = self._encrypt_command(command=0x08, admin_identification_mode=0x40)
-        _LOGGER.debug("Sent time sync msg %s", output_value)
+        _LOGGER.debug("Prepared time sync command payload")
         return output_value
 
     def _encrypt_battery(self):
         """Encrypt the battery request command packet."""
         output_value = self._encrypt_command(command=0x06, admin_identification_mode=0x40)
-        _LOGGER.debug("Sent battery msg %s", output_value)
+        _LOGGER.debug("Prepared battery request command payload")
         return output_value
 
     async def locker(self, kind) -> None:
