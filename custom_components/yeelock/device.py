@@ -109,39 +109,37 @@ class Yeelock:
     async def _handle_data(self, sender, value):
         """Handle data notifications."""
         _LOGGER.debug("Received %s from %s", hexlify(value, " "), sender)  # noqa: E501
+        if not value:
+            _LOGGER.warning("Received empty notification from %s", sender)
+            return
         new_state = None
-
-        # Hex the received message
-        received_message = hexlify(value, " ")
-
-        # Extract the first element (index 0) and convert it to an integer
-        first_byte = hex(int(received_message.split()[0], 16))
+        first_byte = value[0]
 
         # Lock change successes
         # Unlocking
-        if first_byte == hex(0x2):
+        if first_byte == 0x2:
             new_state = "unlocking"
 
         # Unlocked
-        elif first_byte == hex(0x3):
+        elif first_byte == 0x3:
             new_state = "unlocked"
 
         # Locking
-        elif first_byte == hex(0x4):
+        elif first_byte == 0x4:
             new_state = "locking"
 
         # Locked
-        elif first_byte == hex(0x5):
+        elif first_byte == 0x5:
             new_state = "locked"
 
         # Lock change failures
         # Invalid signing key
-        elif first_byte == hex(0xFF):
+        elif first_byte == 0xFF:
             _LOGGER.error("Invalid signing key")
             new_state = "jammed"
 
         # Time needs to be synced
-        elif first_byte == hex(0x9):
+        elif first_byte == 0x9:
             _LOGGER.info("Lock reported time drift; syncing time")
             await self.time_sync()
             if self._last_action:
@@ -150,23 +148,24 @@ class Yeelock:
                 self._last_action = None
 
         # Battery response notification
-        elif first_byte == hex(0x7):
+        elif first_byte == 0x7:
             if len(value) > 6:
                 self.battery_level = value[6]
                 _LOGGER.debug("Received battery level: %s%%", self.battery_level)
                 if self._battery_sensor is not None:
                     await self._battery_sensor._update_battery_level(self.battery_level)
             else:
-                _LOGGER.warning("Battery notification too short: %s", received_message)
+                _LOGGER.warning("Battery notification too short: %s", hexlify(value, " "))
 
         # Unknown notification received
         else:
-            _LOGGER.warning("Unknown notification received (%s)", first_byte)
+            _LOGGER.warning("Unknown notification received (0x%02x)", first_byte)
 
         # Update to the new lock state, if we have one
         if new_state is not None:
             _LOGGER.debug("Notified of %s", new_state)
-            await self._lock._update_lock_state(new_state)
+            if self._lock is not None:
+                await self._lock._update_lock_state(new_state)
 
     def _encrypt_command(
         self, command: int, admin_identification_mode: int, payload: bytes = b""
